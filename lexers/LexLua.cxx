@@ -43,11 +43,11 @@ static int LongDelimCheck(StyleContext &sc) {
 }
 
 static void ColouriseLuaDoc(
-	Sci_PositionU startPos,
-	Sci_Position length,
-	int initStyle,
-	WordList *keywordlists[],
-	Accessor &styler) {
+    Sci_PositionU startPos,
+    Sci_Position length,
+    int initStyle,
+    WordList *keywordlists[],
+    Accessor &styler) {
 
     // x-studio365 spec: function name&parameter Colour support.
     enum SyntaxState {
@@ -63,172 +63,176 @@ static void ColouriseLuaDoc(
 
     SyntaxContext currentSyntaxContext;
     currentSyntaxContext.state = static_cast<SyntaxState>(styler.GetPropertyInt("syntax.state", 0));
-	const WordList &keywords = *keywordlists[0];
-	const WordList &keywords2 = *keywordlists[1];
-	const WordList &keywords3 = *keywordlists[2];
-	const WordList &keywords4 = *keywordlists[3];
-	const WordList &keywords5 = *keywordlists[4];
-	const WordList &keywords6 = *keywordlists[5];
-	const WordList &keywords7 = *keywordlists[6];
-	const WordList &keywords8 = *keywordlists[7];
+    const WordList &keywords = *keywordlists[0];
+    const WordList &keywords2 = *keywordlists[1];
+    const WordList &keywords3 = *keywordlists[2];
+    const WordList &keywords4 = *keywordlists[3];
+    const WordList &keywords5 = *keywordlists[4];
+    const WordList &keywords6 = *keywordlists[5];
+    const WordList &keywords7 = *keywordlists[6];
+    const WordList &keywords8 = *keywordlists[7];
 
-	// Accepts accented characters
-	CharacterSet setWordStart(CharacterSet::setAlpha, "_", 0x80, true);
-	CharacterSet setWord(CharacterSet::setAlphaNum, "_", 0x80, true);
-	// Not exactly following number definition (several dots are seen as OK, etc.)
-	// but probably enough in most cases. [pP] is for hex floats.
-	CharacterSet setNumber(CharacterSet::setDigits, ".-+abcdefpABCDEFP");
-	CharacterSet setExponent(CharacterSet::setNone, "eEpP");
-	CharacterSet setLuaOperator(CharacterSet::setNone, "*/-+()={}~[];<>,.^%:#&|");
-	CharacterSet setEscapeSkip(CharacterSet::setNone, "\"'\\");
+    // Accepts accented characters
+    CharacterSet setWordStart(CharacterSet::setAlpha, "_", 0x80, true);
+    CharacterSet setWord(CharacterSet::setAlphaNum, "_", 0x80, true);
+    // Not exactly following number definition (several dots are seen as OK, etc.)
+    // but probably enough in most cases. [pP] is for hex floats.
+    CharacterSet setNumber(CharacterSet::setDigits, ".-+abcdefpABCDEFP");
+    CharacterSet setExponent(CharacterSet::setNone, "eEpP");
+    CharacterSet setLuaOperator(CharacterSet::setNone, "*/-+()={}~[];<>,.^%:#&|");
+    CharacterSet setEscapeSkip(CharacterSet::setNone, "\"'\\");
 
-	Sci_Position currentLine = styler.GetLine(startPos);
-	// Initialize long string [[ ... ]] or block comment --[[ ... ]] nesting level,
-	// if we are inside such a string. Block comment was introduced in Lua 5.0,
-	// blocks with separators [=[ ... ]=] in Lua 5.1.
-	// Continuation of a string (\z whitespace escaping) is controlled by stringWs.
-	int nestLevel = 0;
-	int sepCount = 0;
-	int stringWs = 0;
-	if (initStyle == SCE_LUA_LITERALSTRING || initStyle == SCE_LUA_COMMENT ||
-		initStyle == SCE_LUA_STRING || initStyle == SCE_LUA_CHARACTER) {
-		const int lineState = styler.GetLineState(currentLine - 1);
-		nestLevel = lineState >> 9;
-		sepCount = lineState & 0xFF;
-		stringWs = lineState & 0x100;
-	}
+    Sci_Position currentLine = styler.GetLine(startPos);
+    // Initialize long string [[ ... ]] or block comment --[[ ... ]] nesting level,
+    // if we are inside such a string. Block comment was introduced in Lua 5.0,
+    // blocks with separators [=[ ... ]=] in Lua 5.1.
+    // Continuation of a string (\z whitespace escaping) is controlled by stringWs.
+    int nestLevel = 0;
+    int sepCount = 0;
+    int stringWs = 0;
+    if (initStyle == SCE_LUA_LITERALSTRING || initStyle == SCE_LUA_COMMENT ||
+        initStyle == SCE_LUA_STRING || initStyle == SCE_LUA_CHARACTER) {
+        const int lineState = styler.GetLineState(currentLine - 1);
+        nestLevel = lineState >> 9;
+        sepCount = lineState & 0xFF;
+        stringWs = lineState & 0x100;
+    }
 
-	// results of identifier/keyword matching
-	Sci_Position idenPos = 0;
-	Sci_Position idenWordPos = 0;
-	int idenStyle = SCE_LUA_IDENTIFIER;
-	bool foundGoto = false;
+    // results of identifier/keyword matching
+    Sci_Position idenPos = 0;
+    Sci_Position idenWordPos = 0;
+    int idenStyle = SCE_LUA_IDENTIFIER;
+    bool foundGoto = false;
     bool foundFunction = false; // x-studio365 spec
 
-	// Do not leak onto next line
-	if (initStyle == SCE_LUA_STRINGEOL || initStyle == SCE_LUA_COMMENTLINE || initStyle == SCE_LUA_PREPROCESSOR) {
-		initStyle = SCE_LUA_DEFAULT;
-	}
+    // Do not leak onto next line
+    if (initStyle == SCE_LUA_STRINGEOL || initStyle == SCE_LUA_COMMENTLINE || initStyle == SCE_LUA_PREPROCESSOR) {
+        initStyle = SCE_LUA_DEFAULT;
+    }
 
-	StyleContext sc(startPos, length, initStyle, styler);
-	if (startPos == 0 && sc.ch == '#' && sc.chNext == '!') {
-		// shbang line: "#!" is a comment only if located at the start of the script
-		sc.SetState(SCE_LUA_COMMENTLINE);
-	}
-	for (; sc.More(); sc.Forward()) {
-		if (sc.atLineEnd) {
-			// Update the line state, so it can be seen by next line
-			currentLine = styler.GetLine(sc.currentPos);
-			switch (sc.state) {
-			case SCE_LUA_LITERALSTRING:
-			case SCE_LUA_COMMENT:
-			case SCE_LUA_STRING:
-			case SCE_LUA_CHARACTER:
-				// Inside a literal string, block comment or string, we set the line state
-				styler.SetLineState(currentLine, (nestLevel << 9) | stringWs | sepCount);
-				break;
-			default:
-				// Reset the line state
-				styler.SetLineState(currentLine, 0);
-				break;
-			}
-		}
-		if (sc.atLineStart && (sc.state == SCE_LUA_STRING)) {
-			// Prevent SCE_LUA_STRINGEOL from leaking back to previous line
-			sc.SetState(SCE_LUA_STRING);
-		}
+    StyleContext sc(startPos, length, initStyle, styler);
+    if (startPos == 0 && sc.ch == '#' && sc.chNext == '!') {
+        // shbang line: "#!" is a comment only if located at the start of the script
+        sc.SetState(SCE_LUA_COMMENTLINE);
+    }
+    for (; sc.More(); sc.Forward()) {
+        if (sc.atLineEnd) {
+            // Update the line state, so it can be seen by next line
+            currentLine = styler.GetLine(sc.currentPos);
+            switch (sc.state) {
+            case SCE_LUA_LITERALSTRING:
+            case SCE_LUA_COMMENT:
+            case SCE_LUA_STRING:
+            case SCE_LUA_CHARACTER:
+                // Inside a literal string, block comment or string, we set the line state
+                styler.SetLineState(currentLine, (nestLevel << 9) | stringWs | sepCount);
+                break;
+            default:
+                // Reset the line state
+                styler.SetLineState(currentLine, 0);
+                break;
+            }
+        }
+        if (sc.atLineStart && (sc.state == SCE_LUA_STRING)) {
+            // Prevent SCE_LUA_STRINGEOL from leaking back to previous line
+            sc.SetState(SCE_LUA_STRING);
+        }
 
-		// Handle string line continuation
-		if ((sc.state == SCE_LUA_STRING || sc.state == SCE_LUA_CHARACTER) &&
-				sc.ch == '\\') {
-			if (sc.chNext == '\n' || sc.chNext == '\r') {
-				sc.Forward();
-				if (sc.ch == '\r' && sc.chNext == '\n') {
-					sc.Forward();
-				}
-				continue;
-			}
-		}
+        // Handle string line continuation
+        if ((sc.state == SCE_LUA_STRING || sc.state == SCE_LUA_CHARACTER) &&
+            sc.ch == '\\') {
+            if (sc.chNext == '\n' || sc.chNext == '\r') {
+                sc.Forward();
+                if (sc.ch == '\r' && sc.chNext == '\n') {
+                    sc.Forward();
+                }
+                continue;
+            }
+        }
 
-		// Determine if the current state should terminate.
-		if (sc.state == SCE_LUA_OPERATOR) {
-			if (sc.ch == ':' && sc.chPrev == ':') {	// :: <label> :: forward scan
-				sc.Forward();
-				Sci_Position ln = 0;
-				while (IsASpaceOrTab(sc.GetRelative(ln)))	// skip over spaces/tabs
-					ln++;
-				Sci_Position ws1 = ln;
-				if (setWordStart.Contains(sc.GetRelative(ln))) {
-					int c, i = 0;
-					char s[100];
-					while (setWord.Contains(c = sc.GetRelative(ln))) {	// get potential label
-						if (i < 90)
-							s[i++] = static_cast<char>(c);
-						ln++;
-					}
-					s[i] = '\0'; Sci_Position lbl = ln;
-					if (!keywords.InList(s)) {
-						while (IsASpaceOrTab(sc.GetRelative(ln)))	// skip over spaces/tabs
-							ln++;
-						Sci_Position ws2 = ln - lbl;
-						if (sc.GetRelative(ln) == ':' && sc.GetRelative(ln + 1) == ':') {
-							// final :: found, complete valid label construct
-							sc.ChangeState(SCE_LUA_LABEL);
-							if (ws1) {
-								sc.SetState(SCE_LUA_DEFAULT);
-								sc.ForwardBytes(ws1);
-							}
-							sc.SetState(SCE_LUA_LABEL);
-							sc.ForwardBytes(lbl - ws1);
-							if (ws2) {
-								sc.SetState(SCE_LUA_DEFAULT);
-								sc.ForwardBytes(ws2);
-							}
-							sc.SetState(SCE_LUA_LABEL);
-							sc.ForwardBytes(2);
-						}
-					}
-				}
-			}
-			sc.SetState(SCE_LUA_DEFAULT);
-		} else if (sc.state == SCE_LUA_NUMBER) {
-			// We stop the number definition on non-numerical non-dot non-eEpP non-sign non-hexdigit char
-			if (!setNumber.Contains(sc.ch)) {
-				sc.SetState(SCE_LUA_DEFAULT);
-			} else if (sc.ch == '-' || sc.ch == '+') {
-				if (!setExponent.Contains(sc.chPrev))
-					sc.SetState(SCE_LUA_DEFAULT);
-			}
-		} else if (sc.state == SCE_LUA_IDENTIFIER) {
-			idenPos--;			// commit already-scanned identitier/word parts
-			if (idenWordPos > 0) {
-				idenWordPos--;
-				sc.ChangeState(idenStyle);
-				sc.ForwardBytes(idenWordPos);
-				idenPos -= idenWordPos;
-				if (idenPos > 0) {
-					sc.SetState(SCE_LUA_IDENTIFIER);
-					sc.ForwardBytes(idenPos);
-				}
-			} else {
-				sc.ForwardBytes(idenPos);
-			}
-			sc.SetState(SCE_LUA_DEFAULT);
-			if (foundGoto) {					// goto <label> forward scan
-				while (IsASpaceOrTab(sc.ch) && !sc.atLineEnd)
-					sc.Forward();
-				if (setWordStart.Contains(sc.ch)) {
-					sc.SetState(SCE_LUA_LABEL);
-					sc.Forward();
-					while (setWord.Contains(sc.ch))
-						sc.Forward();
-					char s[100];
-					sc.GetCurrent(s, sizeof(s));
-					if (keywords.InList(s))		// labels cannot be keywords
-						sc.ChangeState(SCE_LUA_WORD);
-				}
-				sc.SetState(SCE_LUA_DEFAULT);
-			}
+        // Determine if the current state should terminate.
+        if (sc.state == SCE_LUA_OPERATOR) {
+            if (sc.ch == ':' && sc.chPrev == ':') {	// :: <label> :: forward scan
+                sc.Forward();
+                Sci_Position ln = 0;
+                while (IsASpaceOrTab(sc.GetRelative(ln)))	// skip over spaces/tabs
+                    ln++;
+                Sci_Position ws1 = ln;
+                if (setWordStart.Contains(sc.GetRelative(ln))) {
+                    int c, i = 0;
+                    char s[100];
+                    while (setWord.Contains(c = sc.GetRelative(ln))) {	// get potential label
+                        if (i < 90)
+                            s[i++] = static_cast<char>(c);
+                        ln++;
+                    }
+                    s[i] = '\0'; Sci_Position lbl = ln;
+                    if (!keywords.InList(s)) {
+                        while (IsASpaceOrTab(sc.GetRelative(ln)))	// skip over spaces/tabs
+                            ln++;
+                        Sci_Position ws2 = ln - lbl;
+                        if (sc.GetRelative(ln) == ':' && sc.GetRelative(ln + 1) == ':') {
+                            // final :: found, complete valid label construct
+                            sc.ChangeState(SCE_LUA_LABEL);
+                            if (ws1) {
+                                sc.SetState(SCE_LUA_DEFAULT);
+                                sc.ForwardBytes(ws1);
+                            }
+                            sc.SetState(SCE_LUA_LABEL);
+                            sc.ForwardBytes(lbl - ws1);
+                            if (ws2) {
+                                sc.SetState(SCE_LUA_DEFAULT);
+                                sc.ForwardBytes(ws2);
+                            }
+                            sc.SetState(SCE_LUA_LABEL);
+                            sc.ForwardBytes(2);
+                        }
+                    }
+                }
+            }
+            sc.SetState(SCE_LUA_DEFAULT);
+        }
+        else if (sc.state == SCE_LUA_NUMBER) {
+            // We stop the number definition on non-numerical non-dot non-eEpP non-sign non-hexdigit char
+            if (!setNumber.Contains(sc.ch)) {
+                sc.SetState(SCE_LUA_DEFAULT);
+            }
+            else if (sc.ch == '-' || sc.ch == '+') {
+                if (!setExponent.Contains(sc.chPrev))
+                    sc.SetState(SCE_LUA_DEFAULT);
+            }
+        }
+        else if (sc.state == SCE_LUA_IDENTIFIER) {
+            idenPos--;			// commit already-scanned identitier/word parts
+            if (idenWordPos > 0) {
+                idenWordPos--;
+                sc.ChangeState(idenStyle);
+                sc.ForwardBytes(idenWordPos);
+                idenPos -= idenWordPos;
+                if (idenPos > 0) {
+                    sc.SetState(SCE_LUA_IDENTIFIER);
+                    sc.ForwardBytes(idenPos);
+                }
+            }
+            else {
+                sc.ForwardBytes(idenPos);
+            }
+            sc.SetState(SCE_LUA_DEFAULT);
+            if (foundGoto) {					// goto <label> forward scan
+                while (IsASpaceOrTab(sc.ch) && !sc.atLineEnd)
+                    sc.Forward();
+                if (setWordStart.Contains(sc.ch)) {
+                    sc.SetState(SCE_LUA_LABEL);
+                    sc.Forward();
+                    while (setWord.Contains(sc.ch))
+                        sc.Forward();
+                    char s[100];
+                    sc.GetCurrent(s, sizeof(s));
+                    if (keywords.InList(s))		// labels cannot be keywords
+                        sc.ChangeState(SCE_LUA_WORD);
+                }
+                sc.SetState(SCE_LUA_DEFAULT);
+            }
             else if (foundFunction) { // x-studio365 spec, function <name> forward scan, Ah, so easy, send a pull request?
                 if (currentSyntaxContext.state == SyntaxState::normal)
                 { // x-sutdio365 spec: function name expected
@@ -236,211 +240,239 @@ static void ColouriseLuaDoc(
                 }
                 sc.SetState(SCE_LUA_DEFAULT);
             }
-		} else if (sc.state == SCE_LUA_COMMENTLINE || sc.state == SCE_LUA_PREPROCESSOR) {
-			if (sc.atLineEnd) {
-				sc.ForwardSetState(SCE_LUA_DEFAULT);
-			}
-		} else if (sc.state == SCE_LUA_STRING) {
-			if (stringWs) {
-				if (!IsASpace(sc.ch))
-					stringWs = 0;
-			}
-			if (sc.ch == '\\') {
-				if (setEscapeSkip.Contains(sc.chNext)) {
-					sc.Forward();
-				} else if (sc.chNext == 'z') {
-					sc.Forward();
-					stringWs = 0x100;
-				}
-			} else if (sc.ch == '\"') {
-				sc.ForwardSetState(SCE_LUA_DEFAULT);
-			} else if (stringWs == 0 && sc.atLineEnd) {
-				sc.ChangeState(SCE_LUA_STRINGEOL);
-				sc.ForwardSetState(SCE_LUA_DEFAULT);
-			}
-		} else if (sc.state == SCE_LUA_CHARACTER) {
-			if (stringWs) {
-				if (!IsASpace(sc.ch))
-					stringWs = 0;
-			}
-			if (sc.ch == '\\') {
-				if (setEscapeSkip.Contains(sc.chNext)) {
-					sc.Forward();
-				} else if (sc.chNext == 'z') {
-					sc.Forward();
-					stringWs = 0x100;
-				}
-			} else if (sc.ch == '\'') {
-				sc.ForwardSetState(SCE_LUA_DEFAULT);
-			} else if (stringWs == 0 && sc.atLineEnd) {
-				sc.ChangeState(SCE_LUA_STRINGEOL);
-				sc.ForwardSetState(SCE_LUA_DEFAULT);
-			}
-		} else if (sc.state == SCE_LUA_LITERALSTRING || sc.state == SCE_LUA_COMMENT) {
-			if (sc.ch == '[') {
-				const int sep = LongDelimCheck(sc);
-				if (sep == 1 && sepCount == 1) {    // [[-only allowed to nest
+        }
+        else if (sc.state == SCE_LUA_COMMENTLINE || sc.state == SCE_LUA_PREPROCESSOR) {
+            if (sc.atLineEnd) {
+                sc.ForwardSetState(SCE_LUA_DEFAULT);
+            }
+        }
+        else if (sc.state == SCE_LUA_STRING) {
+            if (stringWs) {
+                if (!IsASpace(sc.ch))
+                    stringWs = 0;
+            }
+            if (sc.ch == '\\') {
+                if (setEscapeSkip.Contains(sc.chNext)) {
+                    sc.Forward();
+                }
+                else if (sc.chNext == 'z') {
+                    sc.Forward();
+                    stringWs = 0x100;
+                }
+            }
+            else if (sc.ch == '\"') {
+                sc.ForwardSetState(SCE_LUA_DEFAULT);
+            }
+            else if (stringWs == 0 && sc.atLineEnd) {
+                sc.ChangeState(SCE_LUA_STRINGEOL);
+                sc.ForwardSetState(SCE_LUA_DEFAULT);
+            }
+        }
+        else if (sc.state == SCE_LUA_CHARACTER) {
+            if (stringWs) {
+                if (!IsASpace(sc.ch))
+                    stringWs = 0;
+            }
+            if (sc.ch == '\\') {
+                if (setEscapeSkip.Contains(sc.chNext)) {
+                    sc.Forward();
+                }
+                else if (sc.chNext == 'z') {
+                    sc.Forward();
+                    stringWs = 0x100;
+                }
+            }
+            else if (sc.ch == '\'') {
+                sc.ForwardSetState(SCE_LUA_DEFAULT);
+            }
+            else if (stringWs == 0 && sc.atLineEnd) {
+                sc.ChangeState(SCE_LUA_STRINGEOL);
+                sc.ForwardSetState(SCE_LUA_DEFAULT);
+            }
+        }
+        else if (sc.state == SCE_LUA_LITERALSTRING || sc.state == SCE_LUA_COMMENT) {
+            if (sc.ch == '[') {
+                const int sep = LongDelimCheck(sc);
+                if (sep == 1 && sepCount == 1) {    // [[-only allowed to nest
                     if (nestLevel <= 0) { // https://github.com/halx99/x-studio365/issues/259
                         nestLevel++;
                         sc.Forward();
                     }
-			} else if (sc.ch == ']') {
-				int sep = LongDelimCheck(sc);
-				if (sep == 1 && sepCount == 1) {    // un-nest with ]]-only
-                    if (nestLevel > 0) {  // https://github.com/halx99/x-studio365/issues/259
-                        nestLevel--;
-                        sc.Forward();
-                        if (nestLevel == 0) {
-                            sc.ForwardSetState(SCE_LUA_DEFAULT);
+                }
+                else if (sc.ch == ']') {
+                    int sep = LongDelimCheck(sc);
+                    if (sep == 1 && sepCount == 1) {    // un-nest with ]]-only
+                        if (nestLevel > 0) {  // https://github.com/halx99/x-studio365/issues/259
+                            nestLevel--;
+                            sc.Forward();
+                            if (nestLevel == 0) {
+                                sc.ForwardSetState(SCE_LUA_DEFAULT);
+                            }
                         }
                     }
-				} else if (sep > 1 && sep == sepCount) {   // ]=]-style delim
-					sc.Forward(sep);
-					sc.ForwardSetState(SCE_LUA_DEFAULT);
-				}
-			}
-		}
+                    else if (sep > 1 && sep == sepCount) {   // ]=]-style delim
+                        sc.Forward(sep);
+                        sc.ForwardSetState(SCE_LUA_DEFAULT);
+                    }
+                }
+            }
 
-		// Determine if a new state should be entered.
-		if (sc.state == SCE_LUA_DEFAULT) {
-			if (IsADigit(sc.ch) || (sc.ch == '.' && IsADigit(sc.chNext))) {
-				sc.SetState(SCE_LUA_NUMBER);
-				if (sc.ch == '0' && toupper(sc.chNext) == 'X') {
-					sc.Forward();
-				}
-			} else if (setWordStart.Contains(sc.ch)) {
-				// For matching various identifiers with dots and colons, multiple
-				// matches are done as identifier segments are added. Longest match is
-				// set to a word style. The non-matched part is in identifier style.
-				std::string ident;
-				idenPos = 0;
-				idenWordPos = 0;
-				idenStyle = SCE_LUA_IDENTIFIER;
-				foundGoto = false;
-                foundFunction = false;
-				int cNext;
-				do {
-					int c;
-					const Sci_Position idenPosOld = idenPos;
-					std::string identSeg;
-					identSeg += static_cast<char>(sc.GetRelative(idenPos++));
-					while (setWord.Contains(c = sc.GetRelative(idenPos))) {
-						identSeg += static_cast<char>(c);
-						idenPos++;
-					}
-					if (keywords.InList(identSeg.c_str()) && (idenPosOld > 0)) {
-						idenPos = idenPosOld - 1;	// keywords cannot mix
-						ident.pop_back();
-						break;
-					}
-					ident += identSeg;
-					const char* s = ident.c_str();
-					int newStyle = SCE_LUA_IDENTIFIER;
-					if (keywords.InList(s)) {
-						newStyle = SCE_LUA_WORD;
-					} else if (keywords2.InList(s)) {
-						newStyle = SCE_LUA_WORD2;
-					} else if (keywords3.InList(s)) {
-						newStyle = SCE_LUA_WORD3;
-					} else if (keywords4.InList(s)) {
-						newStyle = SCE_LUA_WORD4;
-					} else if (keywords5.InList(s)) {
-						newStyle = SCE_LUA_WORD5;
-					} else if (keywords6.InList(s)) {
-						newStyle = SCE_LUA_WORD6;
-					} else if (keywords7.InList(s)) {
-						newStyle = SCE_LUA_WORD7;
-					} else if (keywords8.InList(s)) {
-						newStyle = SCE_LUA_WORD8;
+            // Determine if a new state should be entered.
+            if (sc.state == SCE_LUA_DEFAULT) {
+                if (IsADigit(sc.ch) || (sc.ch == '.' && IsADigit(sc.chNext))) {
+                    sc.SetState(SCE_LUA_NUMBER);
+                    if (sc.ch == '0' && toupper(sc.chNext) == 'X') {
+                        sc.Forward();
+                    }
+                }
+                else if (setWordStart.Contains(sc.ch)) {
+                    // For matching various identifiers with dots and colons, multiple
+                    // matches are done as identifier segments are added. Longest match is
+                    // set to a word style. The non-matched part is in identifier style.
+                    std::string ident;
+                    idenPos = 0;
+                    idenWordPos = 0;
+                    idenStyle = SCE_LUA_IDENTIFIER;
+                    foundGoto = false;
+                    foundFunction = false;
+                    int cNext;
+                    do {
+                        int c;
+                        const Sci_Position idenPosOld = idenPos;
+                        std::string identSeg;
+                        identSeg += static_cast<char>(sc.GetRelative(idenPos++));
+                        while (setWord.Contains(c = sc.GetRelative(idenPos))) {
+                            identSeg += static_cast<char>(c);
+                            idenPos++;
+                        }
+                        if (keywords.InList(identSeg.c_str()) && (idenPosOld > 0)) {
+                            idenPos = idenPosOld - 1;	// keywords cannot mix
+                            ident.pop_back();
+                            break;
+                        }
+                        ident += identSeg;
+                        const char* s = ident.c_str();
+                        int newStyle = SCE_LUA_IDENTIFIER;
+                        if (keywords.InList(s)) {
+                            newStyle = SCE_LUA_WORD;
+                        }
+                        else if (keywords2.InList(s)) {
+                            newStyle = SCE_LUA_WORD2;
+                        }
+                        else if (keywords3.InList(s)) {
+                            newStyle = SCE_LUA_WORD3;
+                        }
+                        else if (keywords4.InList(s)) {
+                            newStyle = SCE_LUA_WORD4;
+                        }
+                        else if (keywords5.InList(s)) {
+                            newStyle = SCE_LUA_WORD5;
+                        }
+                        else if (keywords6.InList(s)) {
+                            newStyle = SCE_LUA_WORD6;
+                        }
+                        else if (keywords7.InList(s)) {
+                            newStyle = SCE_LUA_WORD7;
+                        }
+                        else if (keywords8.InList(s)) {
+                            newStyle = SCE_LUA_WORD8;
+                        }
+                        else {
+                            switch (currentSyntaxContext.state) { // x-studio365 spec
+                            case SyntaxState::funcdef_name:
+                                newStyle = SCE_LUA_FUNCTION_NAME;
+                                break;
+                            case SyntaxState::funcdef_param:
+                                newStyle = SCE_LUA_FUNCTION_PARAM;
+                                break;
+                            default:;
+                            }
+                        }
+                        if (newStyle != SCE_LUA_IDENTIFIER) {
+                            idenStyle = newStyle;
+                            idenWordPos = idenPos;
+                        }
+                        if (idenStyle == SCE_LUA_WORD)	// keywords cannot mix
+                            break;
+                        cNext = sc.GetRelative(idenPos + 1);
+                        if ((c == '.' || c == ':') && setWordStart.Contains(cNext)) {
+                            ident += static_cast<char>(c);
+                            idenPos++;
+                        }
+                        else {
+                            cNext = 0;
+                        }
+                    } while (cNext);
+                    if (idenStyle == SCE_LUA_WORD) {
+                        if (ident.compare("goto") == 0)
+                            foundGoto = true;
+                        else if (ident.compare("function") == 0)
+                            foundFunction = true;
+                    }
+                    sc.SetState(SCE_LUA_IDENTIFIER);
+                }
+                else if (sc.ch == '\"') {
+                    sc.SetState(SCE_LUA_STRING);
+                    stringWs = 0;
+                }
+                else if (sc.ch == '\'') {
+                    sc.SetState(SCE_LUA_CHARACTER);
+                    stringWs = 0;
+                }
+                else if (sc.ch == '[') {
+                    sepCount = LongDelimCheck(sc);
+                    if (sepCount == 0) {
+                        sc.SetState(SCE_LUA_OPERATOR);
                     }
                     else {
-                        switch (currentSyntaxContext.state) { // x-studio365 spec
-                        case SyntaxState::funcdef_name:
-                            newStyle = SCE_LUA_FUNCTION_NAME;
-                            break;
-                        case SyntaxState::funcdef_param:
-                            newStyle = SCE_LUA_FUNCTION_PARAM;
-                            break;
-                        default:;
+                        nestLevel = 1;
+                        sc.SetState(SCE_LUA_LITERALSTRING);
+                        sc.Forward(sepCount);
+                    }
+                }
+                else if (sc.Match('-', '-')) {
+                    sc.SetState(SCE_LUA_COMMENTLINE);
+                    if (sc.Match("--[")) {
+                        sc.Forward(2);
+                        sepCount = LongDelimCheck(sc);
+                        if (sepCount > 0) {
+                            nestLevel = 1;
+                            sc.ChangeState(SCE_LUA_COMMENT);
+                            sc.Forward(sepCount);
                         }
                     }
-					if (newStyle != SCE_LUA_IDENTIFIER) {
-						idenStyle = newStyle;
-						idenWordPos = idenPos;
-					}
-					if (idenStyle == SCE_LUA_WORD)	// keywords cannot mix
-						break;
-					cNext = sc.GetRelative(idenPos + 1);
-					if ((c == '.' || c == ':') && setWordStart.Contains(cNext)) {
-						ident += static_cast<char>(c);
-						idenPos++;
-					} else {
-						cNext = 0;
-					}
-				} while (cNext);
-                if (idenStyle == SCE_LUA_WORD) {
-                    if (ident.compare("goto") == 0)
-                        foundGoto = true;
-                    else if (ident.compare("function") == 0)
-                        foundFunction = true;
+                    else {
+                        sc.Forward();
+                    }
                 }
-				sc.SetState(SCE_LUA_IDENTIFIER);
-			} else if (sc.ch == '\"') {
-				sc.SetState(SCE_LUA_STRING);
-				stringWs = 0;
-			} else if (sc.ch == '\'') {
-				sc.SetState(SCE_LUA_CHARACTER);
-				stringWs = 0;
-			} else if (sc.ch == '[') {
-				sepCount = LongDelimCheck(sc);
-				if (sepCount == 0) {
-					sc.SetState(SCE_LUA_OPERATOR);
-				} else {
-					nestLevel = 1;
-					sc.SetState(SCE_LUA_LITERALSTRING);
-					sc.Forward(sepCount);
-				}
-			} else if (sc.Match('-', '-')) {
-				sc.SetState(SCE_LUA_COMMENTLINE);
-				if (sc.Match("--[")) {
-					sc.Forward(2);
-					sepCount = LongDelimCheck(sc);
-					if (sepCount > 0) {
-						nestLevel = 1;
-						sc.ChangeState(SCE_LUA_COMMENT);
-						sc.Forward(sepCount);
-					}
-				} else {
-					sc.Forward();
-				}
-			} else if (sc.atLineStart && sc.Match('$')) {
-				sc.SetState(SCE_LUA_PREPROCESSOR);	// Obsolete since Lua 4.0, but still in old code
-            }
-            else if (setLuaOperator.Contains(sc.ch)) {
-                sc.SetState(SCE_LUA_OPERATOR);
-                switch (sc.ch) { // x-studio365 spec spec: function param Colourise support.
-                case '(':
-                    if (currentSyntaxContext.state == SyntaxState::funcdef_name)
-                        currentSyntaxContext.state = SyntaxState::funcdef_param;
-                    break;
-                case ')':
-                    if (currentSyntaxContext.state == SyntaxState::funcdef_param)
-                        currentSyntaxContext.state = SyntaxState::normal;
-                    break;
+                else if (sc.atLineStart && sc.Match('$')) {
+                    sc.SetState(SCE_LUA_PREPROCESSOR);	// Obsolete since Lua 4.0, but still in old code
+                }
+                else if (setLuaOperator.Contains(sc.ch)) {
+                    sc.SetState(SCE_LUA_OPERATOR);
+                    switch (sc.ch) { // x-studio365 spec spec: function param Colourise support.
+                    case '(':
+                        if (currentSyntaxContext.state == SyntaxState::funcdef_name)
+                            currentSyntaxContext.state = SyntaxState::funcdef_param;
+                        break;
+                    case ')':
+                        if (currentSyntaxContext.state == SyntaxState::funcdef_param)
+                            currentSyntaxContext.state = SyntaxState::normal;
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    if (styler.pprops != nullptr) { // x-studio365 spec
-        char buf[8];
-        sprintf(buf, "%d", static_cast<int>(currentSyntaxContext.state));
-        //styler.pprops->Set("syntax.state", buf);
-    }
+        if (styler.pprops != nullptr) { // x-studio365 spec
+            char buf[8];
+            sprintf(buf, "%d", static_cast<int>(currentSyntaxContext.state));
+            //styler.pprops->Set("syntax.state", buf);
+        }
 
-	sc.Complete();
+        sc.Complete();
+    }
 }
-
 static void FoldLuaDoc(Sci_PositionU startPos, Sci_Position length, int /* initStyle */, WordList *[],
                        Accessor &styler) {
 	const Sci_PositionU lengthDoc = startPos + length;

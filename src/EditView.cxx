@@ -1709,7 +1709,7 @@ void EditView::DrawForeground(Surface *surface, const EditModel &model, const Vi
 							if (indentCount > 0) {
 								const XYPOSITION xIndent = floor(indentCount * indentWidth);
 								DrawIndentGuide(surface, lineVisible, vsDraw.lineHeight, xIndent + xStart, rcSegment,
-									(ll->xHighlightGuide == xIndent));
+									(ll->xHighlightGuide == xIndent), vsDraw.zoomLevel);
 							}
 						}
 					}
@@ -1789,7 +1789,7 @@ void EditView::DrawForeground(Surface *surface, const EditModel &model, const Vi
 									if (indentCount > 0) {
 										const XYPOSITION xIndent = floor(indentCount * indentWidth);
 										DrawIndentGuide(surface, lineVisible, vsDraw.lineHeight, xIndent + xStart, rcSegment,
-											(ll->xHighlightGuide == xIndent));
+											(ll->xHighlightGuide == xIndent), vsDraw.zoomLevel);
 									}
 								}
 							}
@@ -1867,7 +1867,7 @@ void EditView::DrawIndentGuidesOverEmpty(Surface *surface, const EditModel &mode
 			const XYPOSITION xIndent = floor(indentPos * vsDraw.spaceWidth);
 			if (xIndent < xStartText) {
 				DrawIndentGuide(surface, lineVisible, vsDraw.lineHeight, xIndent + xStart, rcLine,
-					(ll->xHighlightGuide == xIndent));
+					(ll->xHighlightGuide == xIndent), vsDraw.zoomLevel);
 			}
 		}
 	}

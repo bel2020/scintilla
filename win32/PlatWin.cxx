@@ -2286,7 +2286,7 @@ void ListBoxX::ClearRegisteredImages() {
 	images.Clear();
 }
 
-// x-studio365 spec, vs-like autoc window
+// HALX99 spec, vs-like autoc window
 namespace acext {
     unsigned int clrFore;
 
@@ -2356,7 +2356,7 @@ void ListBoxX::Draw(DRAWITEMSTRUCT *pDrawItem) {
 	if ((pDrawItem->itemAction == ODA_SELECT) || (pDrawItem->itemAction == ODA_DRAWENTIRE)) {
 		RECT rcBox = pDrawItem->rcItem;
 		rcBox.left += TextOffset();
-#if 1 // x-studio365 spec, vs-like autoc window
+#if 1 // HALX99 spec, vs-like autoc window
 		if (pDrawItem->itemState & ODS_SELECTED) {
 			RECT rcImage = pDrawItem->rcItem;
 			rcImage.right = rcBox.left;

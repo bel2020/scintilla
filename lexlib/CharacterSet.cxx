@@ -16,7 +16,7 @@ using namespace Scintilla;
 namespace Scintilla {
 
 int CompareCaseInsensitive(const char *a, const char *b) {
-#if 1 // x-studio365 spec:
+#if 1 // halx99 spec:
     return _stricmp(a, b);
 #else
 	while (*a && *b) {
@@ -35,7 +35,7 @@ int CompareCaseInsensitive(const char *a, const char *b) {
 }
 
 int CompareNCaseInsensitive(const char *a, const char *b, size_t len) {
-#if 1 // x-studio365 spec: the system standard api is work fine, post a pull request
+#if 1 // halx99 spec: the system standard api is work fine, post a pull request
     return _strnicmp(a, b, len);
 #else
 	while (*a && *b && len) {

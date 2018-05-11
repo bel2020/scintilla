@@ -137,7 +137,7 @@
 #define SCLEX_INDENT 122
 #define SCLEX_MAXIMA 123
 
-// custom lexers, x-studio365: spec
+// custom lexers, halx99: spec
 #define SCLEX_SEARCHRESULT 150
 #define SCLEX_AUTOMATIC 1000
 #define SCE_P_DEFAULT 0
@@ -486,7 +486,7 @@
 #define SCE_LUA_WORD7 18
 #define SCE_LUA_WORD8 19
 #define SCE_LUA_LABEL 20
-// x-studio365 spec.
+// HALX99 spec.
 #define SCE_LUA_FUNCTION_NAME 21
 #define SCE_LUA_FUNCTION_PARAM 22
 

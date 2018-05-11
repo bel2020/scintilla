@@ -365,6 +365,7 @@ class ScintillaWin :
 	void CopyAllowLine() override;
 	bool CanPaste() override;
 	void Paste() override;
+    void QuickPaste() override; // x-studio365 spec.
 	void CreateCallTipWindow(PRectangle rc) override;
 	void AddToPopUp(const char *label, int cmd = 0, bool enabled = true) override;
 	void ClaimSelection() override;
@@ -1457,7 +1458,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 							DisplayCursor(Window::cursorArrow);
 						} else if (KeyboardIsKeyDown(VK_CONTROL) && 
                             (PointIsHotspot(PointFromPOINT(pt))
-                            || hoverIndicatorPos != Sci::invalidPosition)) { // x-studio365 spec, avoid flick & looks like VS
+                            || hoverIndicatorPos != Sci::invalidPosition)) { // HALX99 spec, avoid flick & looks like VS
 							DisplayCursor(Window::cursorHand);
 						} else {
 						    DisplayCursor(Window::cursorText);
