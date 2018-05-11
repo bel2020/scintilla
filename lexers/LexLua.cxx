@@ -299,6 +299,7 @@ static void ColouriseLuaDoc(
                         sc.Forward();
                     }
                 }
+            }
                 else if (sc.ch == ']') {
                     int sep = LongDelimCheck(sc);
                     if (sep == 1 && sepCount == 1) {    // un-nest with ]]-only
@@ -471,8 +472,8 @@ static void ColouriseLuaDoc(
         }
 
         sc.Complete();
-    }
 }
+
 static void FoldLuaDoc(Sci_PositionU startPos, Sci_Position length, int /* initStyle */, WordList *[],
                        Accessor &styler) {
 	const Sci_PositionU lengthDoc = startPos + length;
