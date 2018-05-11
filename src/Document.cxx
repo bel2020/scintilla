@@ -2879,7 +2879,12 @@ bool MatchOnLines(const Document *doc, const Regex &regexp, const RESearchRange 
 	//	Iterator uiEnd(doc, endPos);
 	//	flagsMatch = MatchFlags(doc, startPos, endPos);
 	//	matched = std::regex_search(uiStart, uiEnd, match, regexp, flagsMatch);
-
+#if 1 // x-studio365 spec: improve regex search
+    Iterator uiStart(doc, resr.startPos);
+    Iterator uiEnd(doc, resr.endPos);
+    std::regex_constants::match_flag_type flagsMatch = MatchFlags(doc, resr.startPos, resr.endPos);
+    matched = std::regex_search(uiStart, uiEnd, match, regexp, flagsMatch);
+#else
 	// Line by line.
 	for (Sci::Line line = resr.lineRangeStart; line != resr.lineRangeBreak; line += resr.increment) {
 		const Range lineRange = resr.LineRange(line);
@@ -2908,6 +2913,7 @@ bool MatchOnLines(const Document *doc, const Regex &regexp, const RESearchRange 
 			break;
 		}
 	}
+#endif
 	if (matched) {
 		for (size_t co = 0; co < match.size(); co++) {
 			search.bopat[co] = match[co].first.Pos();

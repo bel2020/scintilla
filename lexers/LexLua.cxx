@@ -49,6 +49,20 @@ static void ColouriseLuaDoc(
 	WordList *keywordlists[],
 	Accessor &styler) {
 
+    // x-studio365 spec: function name&parameter Colour support.
+    enum SyntaxState {
+        normal,
+        funcdef_name, // After "function"
+        // funcdef_param_expected, // '('
+        funcdef_param,
+        funcdef_end, // ')'
+    };
+    struct SyntaxContext {
+        SyntaxState state = SyntaxState::normal;
+    };
+
+    SyntaxContext currentSyntaxContext;
+    currentSyntaxContext.state = static_cast<SyntaxState>(styler.GetPropertyInt("syntax.state", 0));
 	const WordList &keywords = *keywordlists[0];
 	const WordList &keywords2 = *keywordlists[1];
 	const WordList &keywords3 = *keywordlists[2];
@@ -89,6 +103,7 @@ static void ColouriseLuaDoc(
 	Sci_Position idenWordPos = 0;
 	int idenStyle = SCE_LUA_IDENTIFIER;
 	bool foundGoto = false;
+    bool foundFunction = false; // x-studio365 spec
 
 	// Do not leak onto next line
 	if (initStyle == SCE_LUA_STRINGEOL || initStyle == SCE_LUA_COMMENTLINE || initStyle == SCE_LUA_PREPROCESSOR) {
@@ -214,6 +229,13 @@ static void ColouriseLuaDoc(
 				}
 				sc.SetState(SCE_LUA_DEFAULT);
 			}
+            else if (foundFunction) { // x-studio365 spec, function <name> forward scan, Ah, so easy, send a pull request?
+                if (currentSyntaxContext.state == SyntaxState::normal)
+                { // x-sutdio365 spec: function name expected
+                    currentSyntaxContext.state = SyntaxState::funcdef_name;
+                }
+                sc.SetState(SCE_LUA_DEFAULT);
+            }
 		} else if (sc.state == SCE_LUA_COMMENTLINE || sc.state == SCE_LUA_PREPROCESSOR) {
 			if (sc.atLineEnd) {
 				sc.ForwardSetState(SCE_LUA_DEFAULT);
@@ -258,17 +280,20 @@ static void ColouriseLuaDoc(
 			if (sc.ch == '[') {
 				const int sep = LongDelimCheck(sc);
 				if (sep == 1 && sepCount == 1) {    // [[-only allowed to nest
-					nestLevel++;
-					sc.Forward();
-				}
+                    if (nestLevel <= 0) { // https://github.com/halx99/x-studio365/issues/259
+                        nestLevel++;
+                        sc.Forward();
+                    }
 			} else if (sc.ch == ']') {
 				int sep = LongDelimCheck(sc);
 				if (sep == 1 && sepCount == 1) {    // un-nest with ]]-only
-					nestLevel--;
-					sc.Forward();
-					if (nestLevel == 0) {
-						sc.ForwardSetState(SCE_LUA_DEFAULT);
-					}
+                    if (nestLevel > 0) {  // https://github.com/halx99/x-studio365/issues/259
+                        nestLevel--;
+                        sc.Forward();
+                        if (nestLevel == 0) {
+                            sc.ForwardSetState(SCE_LUA_DEFAULT);
+                        }
+                    }
 				} else if (sep > 1 && sep == sepCount) {   // ]=]-style delim
 					sc.Forward(sep);
 					sc.ForwardSetState(SCE_LUA_DEFAULT);
@@ -292,6 +317,7 @@ static void ColouriseLuaDoc(
 				idenWordPos = 0;
 				idenStyle = SCE_LUA_IDENTIFIER;
 				foundGoto = false;
+                foundFunction = false;
 				int cNext;
 				do {
 					int c;
@@ -326,7 +352,18 @@ static void ColouriseLuaDoc(
 						newStyle = SCE_LUA_WORD7;
 					} else if (keywords8.InList(s)) {
 						newStyle = SCE_LUA_WORD8;
-					}
+                    }
+                    else {
+                        switch (currentSyntaxContext.state) { // x-studio365 spec
+                        case SyntaxState::funcdef_name:
+                            newStyle = SCE_LUA_FUNCTION_NAME;
+                            break;
+                        case SyntaxState::funcdef_param:
+                            newStyle = SCE_LUA_FUNCTION_PARAM;
+                            break;
+                        default:;
+                        }
+                    }
 					if (newStyle != SCE_LUA_IDENTIFIER) {
 						idenStyle = newStyle;
 						idenWordPos = idenPos;
@@ -341,9 +378,12 @@ static void ColouriseLuaDoc(
 						cNext = 0;
 					}
 				} while (cNext);
-				if ((idenStyle == SCE_LUA_WORD) && (ident.compare("goto") == 0)) {
-					foundGoto = true;
-				}
+                if (idenStyle == SCE_LUA_WORD) {
+                    if (ident.compare("goto") == 0)
+                        foundGoto = true;
+                    else if (ident.compare("function") == 0)
+                        foundFunction = true;
+                }
 				sc.SetState(SCE_LUA_IDENTIFIER);
 			} else if (sc.ch == '\"') {
 				sc.SetState(SCE_LUA_STRING);
@@ -375,11 +415,28 @@ static void ColouriseLuaDoc(
 				}
 			} else if (sc.atLineStart && sc.Match('$')) {
 				sc.SetState(SCE_LUA_PREPROCESSOR);	// Obsolete since Lua 4.0, but still in old code
-			} else if (setLuaOperator.Contains(sc.ch)) {
-				sc.SetState(SCE_LUA_OPERATOR);
-			}
-		}
-	}
+            }
+            else if (setLuaOperator.Contains(sc.ch)) {
+                sc.SetState(SCE_LUA_OPERATOR);
+                switch (sc.ch) { // x-studio365 spec spec: function param Colourise support.
+                case '(':
+                    if (currentSyntaxContext.state == SyntaxState::funcdef_name)
+                        currentSyntaxContext.state = SyntaxState::funcdef_param;
+                    break;
+                case ')':
+                    if (currentSyntaxContext.state == SyntaxState::funcdef_param)
+                        currentSyntaxContext.state = SyntaxState::normal;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (styler.pprops != nullptr) { // x-studio365 spec
+        char buf[8];
+        sprintf(buf, "%d", static_cast<int>(currentSyntaxContext.state));
+        //styler.pprops->Set("syntax.state", buf);
+    }
 
 	sc.Complete();
 }

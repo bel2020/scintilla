@@ -2395,13 +2395,13 @@ void Editor::NotifyIndicatorClick(bool click, Sci::Position position, int modifi
 }
 
 bool Editor::NotifyMarginClick(Point pt, int modifiers) {
-	const int marginClicked = vs.MarginFromLocation(pt);
-	if ((marginClicked >= 0) && vs.ms[marginClicked].sensitive) {
-		const Sci::Position position = pdoc->LineStart(LineFromLocation(pt));
-		if ((vs.ms[marginClicked].mask & SC_MASK_FOLDERS) && (foldAutomatic & SC_AUTOMATICFOLD_CLICK)) {
+	const int varMarginClick = vs.MarginFromLocation(pt);
+	if ((varMarginClick >= 0) && vs.ms[varMarginClick].sensitive) {
+		const Sci::Position position = static_cast<Sci::Position>(pdoc->LineStart(LineFromLocation(pt)));
+		if ((vs.ms[varMarginClick].mask & SC_MASK_FOLDERS) && (foldAutomatic & SC_AUTOMATICFOLD_CLICK)) {
 			const bool ctrl = (modifiers & SCI_CTRL) != 0;
 			const bool shift = (modifiers & SCI_SHIFT) != 0;
-			const Sci::Line lineClick = pdoc->SciLineFromPosition(position);
+			const Sci::Line lineClick = static_cast<Sci::Line>(pdoc->LineFromPosition(position));
 			if (shift && ctrl) {
 				FoldAll(SC_FOLDACTION_TOGGLE);
 			} else {
@@ -2423,15 +2423,37 @@ bool Editor::NotifyMarginClick(Point pt, int modifiers) {
 		SCNotification scn = {};
 		scn.nmhdr.code = SCN_MARGINCLICK;
 		scn.modifiers = modifiers;
-		scn.position = position;
-		scn.margin = marginClicked;
+		scn.position = marginClickPos = position;
+		scn.margin = marginClicked = varMarginClick;
 		NotifyParent(scn);
 		return true;
 	} else {
+        marginClicked = -1;
+        marginClickPos = INVALID_POSITION;
 		return false;
 	}
 }
 
+bool Editor::NotifyMarginReleaseClick(Point pt, int modifiers)
+{ // x-studio365 spec, Margin Release Click support
+    const int varMarginClick = vs.MarginFromLocation(pt);
+    if (marginClicked != -1 && marginClickPos != INVALID_POSITION)
+    {
+        Sci::Position position = pdoc->LineStart(LineFromLocation(pt));
+
+        SCNotification scn = {};
+        scn.nmhdr.code = SCN_MARGINRELEASECLICK;
+        scn.modifiers = modifiers;
+        scn.position = position;
+        scn.margin = varMarginClick;
+        if (marginClicked == varMarginClick) scn.lParam |= 1;
+        if (marginClickPos == position) scn.lParam |= 2;
+        NotifyParent(scn);
+        return true;
+    }
+
+    return false;
+}
 bool Editor::NotifyMarginRightClick(Point pt, int modifiers) {
 	const int marginRightClicked = vs.MarginFromLocation(pt);
 	if ((marginRightClicked >= 0) && vs.ms[marginRightClicked].sensitive) {
@@ -2703,6 +2725,7 @@ void Editor::NotifyMacroRecord(unsigned int iMessage, uptr_t wParam, sptr_t lPar
 	case SCI_APPENDTEXT:
 	case SCI_CLEARALL:
 	case SCI_SELECTALL:
+        case SCI_SELECTALL+1: // x-studio365 spec
 	case SCI_GOTOLINE:
 	case SCI_GOTOPOS:
 	case SCI_SEARCHANCHOR:
@@ -4603,7 +4626,11 @@ void Editor::ButtonDownWithModifiers(Point pt, unsigned int curTime, int modifie
 			if (inDragDrop != ddInitial) {
 				SetDragPosition(SelectionPosition(Sci::invalidPosition));
 				if (!shift) {
-					if (ctrl && multipleSelection) {
+					if (ctrl && multipleSelection 
+                        /*x-studio365 spec spec: disable mutipleSel when hotSpot or hoverIndicator clicked*/
+                        && hotSpotClickPos == Sci::invalidPosition
+                        && hoverIndicatorPos == Sci::invalidPosition)
+                    {
 						const SelectionRange range(newPos);
 						sel.TentativeSelection(range);
 						InvalidateSelection(range, true);
@@ -4820,11 +4847,11 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, int modifiers) {
 			DisplayCursor(Window::cursorArrow);
 		} else {
 			SetHoverIndicatorPoint(pt);
-			if (PointIsHotspot(pt)) {
-				DisplayCursor(Window::cursorHand);
+			if (PointIsHotspot(pt)) { // x-studio365 spec
+				DisplayCursor(ctrl ? Window::cursorHand : Window::cursorText);
 				SetHotSpotRange(&pt);
 			} else {
-				if (hoverIndicatorPos != Sci::invalidPosition)
+				if (ctrl && hoverIndicatorPos != Sci::invalidPosition)
 					DisplayCursor(Window::cursorHand);
 				else
 					DisplayCursor(Window::cursorText);
@@ -5814,6 +5841,15 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 		}
 		EnsureCaretVisible();
 		break;
+
+
+    case SCI_QUICK_PASTE: // x-studio365 spec
+        QuickPaste();
+        if ((caretSticky == SC_CARETSTICKY_OFF) || (caretSticky == SC_CARETSTICKY_WHITESPACE)) {
+            SetLastXChosen();
+        }
+        EnsureCaretVisible();
+        break;
 
 	case SCI_CLEAR:
 		Clear();
@@ -8178,6 +8214,18 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 	case SCI_COUNTCHARACTERS:
 		return pdoc->CountCharacters(static_cast<Sci::Position>(wParam), lParam);
 
+    case 9000: // x-studio365 spec: TODO: define as macro 
+        // 
+        do {
+            // Send notification
+            SCNotification scn = {};
+            scn.nmhdr.code = 9000; // SCN_CUSTOM_COMMAND
+            scn.message = iMessage;
+            scn.wParam = wParam; // SCN_CUSTOM_COMMAND_ID
+            scn.lParam = lParam;
+            NotifyParent(scn);
+        } while (false);
+        break;
 	default:
 		return DefWndProc(iMessage, wParam, lParam);
 	}

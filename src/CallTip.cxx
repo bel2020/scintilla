@@ -157,9 +157,14 @@ void CallTip::DrawChunk(Surface *surface, int &x, const char *s,
 				if (draw) {
 					rcClient.left = static_cast<XYPOSITION>(x);
 					rcClient.right = static_cast<XYPOSITION>(xEnd);
-					surface->DrawTextTransparent(rcClient, font, static_cast<XYPOSITION>(ytext),
-										s+startSeg, endSeg - startSeg,
-					                             highlight ? colourSel : colourUnSel);
+                    if (!highlight) {
+                        surface->DrawTextTransparent(rcClient, font, static_cast<XYPOSITION>(ytext),
+                            s + startSeg, endSeg - startSeg, colourUnSel);
+                    }
+                    else { // x-studio365 spec: highlight bold support
+                        surface->DrawTextTransparent(rcClient, fontSel, static_cast<XYPOSITION>(ytext),
+                            s + startSeg, endSeg - startSeg, colourSel);
+                    }
 				}
 			}
 			x = xEnd;
@@ -233,6 +238,14 @@ void CallTip::PaintCT(Surface *surfaceWindow) {
 	PaintContents(surfaceWindow, true);
 
 #ifndef __APPLE__
+#if 1 // x-studio365 spec, vs-like calltip
+    surfaceWindow->MoveTo(0, static_cast<int>(rcClientSize.bottom) - 1);
+    surfaceWindow->PenColour(colourLight);
+    surfaceWindow->LineTo(static_cast<int>(rcClientSize.right) - 1, static_cast<int>(rcClientSize.bottom) - 1);
+    surfaceWindow->LineTo(static_cast<int>(rcClientSize.right) - 1, 0);
+    surfaceWindow->LineTo(0, 0);
+    surfaceWindow->LineTo(0, static_cast<int>(rcClientSize.bottom) - 1);
+#else
 	// OSX doesn't put borders on "help tags"
 	// Draw a raised border around the edges of the window
 	const IntegerRectangle ircClientSize(rcClientSize);
@@ -243,6 +256,7 @@ void CallTip::PaintCT(Surface *surfaceWindow) {
 	surfaceWindow->PenColour(colourLight);
 	surfaceWindow->LineTo(0, 0);
 	surfaceWindow->LineTo(0, ircClientSize.bottom - 1);
+#endif
 #endif
 }
 
@@ -270,8 +284,12 @@ PRectangle CallTip::CallTipStart(Sci::Position pos, Point pt, int textHeight, co
 	inCallTipMode = true;
 	posStartCallTip = pos;
 	const XYPOSITION deviceHeight = static_cast<XYPOSITION>(surfaceMeasure->DeviceHeightFont(size));
-	const FontParameters fp(faceName, deviceHeight / SC_FONT_SIZE_MULTIPLIER, SC_WEIGHT_NORMAL, false, 0, technology, characterSet);
+    FontParameters fp(faceName, deviceHeight / SC_FONT_SIZE_MULTIPLIER, SC_WEIGHT_NORMAL, false, 0, technology, characterSet);
 	font.Create(fp);
+    /// x-studio365 spec
+    fp.weight = SC_WEIGHT_BOLD;
+    fontSel.Create(fp);
+
 	// Look for multiple lines in the text
 	// Only support \n here - simply means container must avoid \r!
 	const int numLines = 1 + static_cast<int>(std::count(val.begin(), val.end(), '\n'));

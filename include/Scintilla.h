@@ -430,6 +430,7 @@ typedef sptr_t (*SciFnDirect)(sptr_t ptr, unsigned int iMessage, uptr_t wParam, 
 #define SCI_CUT 2177
 #define SCI_COPY 2178
 #define SCI_PASTE 2179
+#define SCI_QUICK_PASTE 2555 // x-studio365 spec
 #define SCI_CLEAR 2180
 #define SCI_SETTEXT 2181
 #define SCI_GETTEXT 2182
@@ -1033,6 +1034,7 @@ typedef sptr_t (*SciFnDirect)(sptr_t ptr, unsigned int iMessage, uptr_t wParam, 
 #define SC_MOD_INSERTCHECK 0x100000
 #define SC_MOD_CHANGETABSTOPS 0x200000
 #define SC_MODEVENTMASKALL 0x3FFFFF
+#define SC_SEARCHRESULT_LINEBUFFERMAXLENGTH 1024 // x-studio365 spec
 #define SC_UPDATE_CONTENT 0x1
 #define SC_UPDATE_SELECTION 0x2
 #define SC_UPDATE_V_SCROLL 0x4
@@ -1083,6 +1085,7 @@ typedef sptr_t (*SciFnDirect)(sptr_t ptr, unsigned int iMessage, uptr_t wParam, 
 #define SCN_MACRORECORD 2009
 #define SCN_MARGINCLICK 2010
 #define SCN_NEEDSHOWN 2011
+#define SCN_MARGINRELEASECLICK 2012 // x-studio365 spec
 #define SCN_PAINTED 2013
 #define SCN_USERLISTSELECTION 2014
 #define SCN_URIDROPPED 2015
@@ -1205,6 +1208,18 @@ struct SCNotification {
 	int updated;	/* SCN_UPDATEUI */
 	int listCompletionMethod;
 	/* SCN_AUTOCSELECTION, SCN_AUTOCCOMPLETED, SCN_USERLISTSELECTION, */
+};
+
+// x-studio365 spec
+struct SearchResultMarking {
+    long _start;
+    long _end;
+};
+
+// x-studio365 spec
+struct SearchResultMarkings {
+    long _length;
+    SearchResultMarking *_markings;
 };
 
 #ifdef INCLUDE_DEPRECATED_FEATURES

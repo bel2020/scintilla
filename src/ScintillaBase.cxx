@@ -131,6 +131,9 @@ void ScintillaBase::Command(int cmdId) {
 	case idcmdSelectAll:
 		WndProc(SCI_SELECTALL, 0, 0);
 		break;
+    case idcmdSelectAll+1: // x-studio365 spec: vscode like replace all matched
+        WndProc(9000, 9001, 0); // Send a SCN_CUSTOM_COMMAND=9000 SCN_CUSTOM_COMMAND_ID=9001
+        break;
 	}
 }
 
@@ -511,6 +514,9 @@ void ScintillaBase::ContextMenu(Point pt) {
 	if (displayPopupMenu) {
 		const bool writable = !WndProc(SCI_GETREADONLY, 0, 0);
 		popup.CreatePopUp();
+		// x-studio365 spec
+        AddToPopUp("Change All Occurrences\tCtrl+F2", idcmdSelectAll+1, writable && !sel.Empty());
+        AddToPopUp("");
 		AddToPopUp("Undo", idcmdUndo, writable && pdoc->CanUndo());
 		AddToPopUp("Redo", idcmdRedo, writable && pdoc->CanRedo());
 		AddToPopUp("");
@@ -841,6 +847,20 @@ void ScintillaBase::NotifyStyleToNeeded(Sci::Position endStyleNeeded) {
 	Editor::NotifyStyleToNeeded(endStyleNeeded);
 }
 
+// x-studio365 spec
+#define SCI_AUTOCFORE 20001
+#define SCI_AUTOCBACK 20002
+#define SCI_AUTOCFOREHIGHLIGHT 20003
+#define SCI_AUTOCBACKHIGHLIGHT 20004
+
+namespace Scintilla { namespace acext { // x-studio365 spec
+    extern void SetFore(unsigned int fore);
+    extern void SetBack(unsigned int fore);
+
+    extern void SetForeHighLight(unsigned int fore);
+    extern void SetBackHighlight(unsigned int fore);
+ };};
+
 void ScintillaBase::NotifyLexerChanged(Document *, void *) {
 #ifdef SCI_LEXER
 	vs.EnsureStyle(0xff);
@@ -852,7 +872,27 @@ sptr_t ScintillaBase::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lPara
 	case SCI_AUTOCSHOW:
 		listType = 0;
 		AutoCompleteStart(static_cast<Sci::Position>(wParam), ConstCharPtrFromSPtr(lParam));
+#if 1
+        // x-studio365 spec, vs like autoc window
+        return reinterpret_cast<sptr_t>(this->ac.lb->GetID());
+#else
 		break;
+#endif
+    case SCI_AUTOCFORE:
+        acext::SetFore(wParam);
+        break;
+
+    case SCI_AUTOCBACK:
+        acext::SetBack(wParam);
+        break;
+
+    case SCI_AUTOCFOREHIGHLIGHT:
+        acext::SetForeHighLight(wParam);
+        break;
+
+    case SCI_AUTOCBACKHIGHLIGHT:
+        acext::SetBackHighlight(wParam);
+        break;
 
 	case SCI_AUTOCCANCEL:
 		ac.Cancel();

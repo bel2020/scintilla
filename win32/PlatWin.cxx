@@ -2286,10 +2286,91 @@ void ListBoxX::ClearRegisteredImages() {
 	images.Clear();
 }
 
+// x-studio365 spec, vs-like autoc window
+namespace acext {
+    unsigned int clrFore;
+
+    unsigned int clrBack;
+    unsigned int clrBackHighlight;
+    unsigned int clrForeHighlight;
+
+    HBRUSH hbrBack;
+    HBRUSH hbrBackHighlight;
+    HBRUSH hbrForeHighlight;
+
+    struct autores
+    {
+        autores()
+        {
+            clrBack = RGB(37, 37, 38);
+            clrFore = RGB(220, 220, 220);
+            clrBackHighlight = RGB(51, 153, 255);
+            clrForeHighlight = RGB(220, 220, 220);
+            hbrBack = ::CreateSolidBrush(clrBack);
+            hbrBackHighlight = ::CreateSolidBrush(clrBackHighlight);
+            hbrForeHighlight = ::CreateSolidBrush(clrForeHighlight);
+        }
+        ~autores()
+        {
+            DeleteObject(hbrForeHighlight);
+            DeleteObject(hbrBackHighlight);
+            DeleteObject(hbrBack);
+        }
+    };
+
+    void SetFore(unsigned int value)
+    {
+        clrFore = value;
+    }
+    void SetBack(unsigned int value)
+    {
+        if (clrBack != value) {
+            clrBack = value;
+            if (hbrBack)
+                DeleteObject(hbrBack);
+            hbrBack = ::CreateSolidBrush(clrBack);
+        }
+    }
+    void SetForeHighLight(unsigned int value)
+    {
+        if (clrForeHighlight != value) {
+            clrForeHighlight = value;
+            if (hbrForeHighlight)
+                DeleteObject(hbrForeHighlight);
+            hbrForeHighlight = ::CreateSolidBrush(clrForeHighlight);
+        }
+    }
+    void SetBackHighlight(unsigned int value)
+    {
+        if (clrBackHighlight != value) {
+            clrBackHighlight = value;
+            if (hbrBackHighlight)
+                DeleteObject(hbrBackHighlight);
+            hbrBackHighlight = ::CreateSolidBrush(clrBackHighlight);
+        }
+    }
+
+    autores autorc;
+}
 void ListBoxX::Draw(DRAWITEMSTRUCT *pDrawItem) {
 	if ((pDrawItem->itemAction == ODA_SELECT) || (pDrawItem->itemAction == ODA_DRAWENTIRE)) {
 		RECT rcBox = pDrawItem->rcItem;
 		rcBox.left += TextOffset();
+#if 1 // x-studio365 spec, vs-like autoc window
+		if (pDrawItem->itemState & ODS_SELECTED) {
+			RECT rcImage = pDrawItem->rcItem;
+			rcImage.right = rcBox.left;
+			// The image is not highlighted
+			::FillRect(pDrawItem->hDC, &rcImage, acext::hbrBackHighlight);
+			::FillRect(pDrawItem->hDC, &rcBox, acext::hbrBackHighlight);
+			::SetBkColor(pDrawItem->hDC, acext::clrBackHighlight);
+			::SetTextColor(pDrawItem->hDC, acext::clrForeHighlight);
+		} else {
+			::FillRect(pDrawItem->hDC, &pDrawItem->rcItem, acext::hbrBack/*reinterpret_cast<HBRUSH>(COLOR_WINDOW+1)*/);
+			::SetBkColor(pDrawItem->hDC, acext::clrBack/*::GetSysColor(COLOR_WINDOW)*/);
+			::SetTextColor(pDrawItem->hDC, acext::clrFore/*::GetSysColor(COLOR_WINDOWTEXT)*/);
+		}
+#else
 		if (pDrawItem->itemState & ODS_SELECTED) {
 			RECT rcImage = pDrawItem->rcItem;
 			rcImage.right = rcBox.left;
@@ -2303,7 +2384,7 @@ void ListBoxX::Draw(DRAWITEMSTRUCT *pDrawItem) {
 			::SetBkColor(pDrawItem->hDC, ::GetSysColor(COLOR_WINDOW));
 			::SetTextColor(pDrawItem->hDC, ::GetSysColor(COLOR_WINDOWTEXT));
 		}
-
+#endif
 		const ListItemData item = lti.Get(pDrawItem->itemID);
 		const int pixId = item.pixId;
 		const char *text = item.text;
@@ -2648,9 +2729,17 @@ void ListBoxX::Paint(HDC hDC) {
 	// unpainted area when at the end of a non-integrally sized list with a
 	// vertical scroll bar
 	RECT rc = { 0, 0, extent.x, extent.y };
-	::FillRect(bitmapDC, &rc, reinterpret_cast<HBRUSH>(COLOR_WINDOW+1));
+#if 1  // x-studio365 spec spec, vs-like autoc window
+	::FillRect(bitmapDC, &rc, acext::hbrBack/*reinterpret_cast<HBRUSH>(COLOR_WINDOW+1)*/);
+#else
+    ::FillRect(bitmapDC, &rc, reinterpret_cast<HBRUSH>(COLOR_WINDOW+1));
+#endif
 	// Paint the entire client area and vertical scrollbar
 	::SendMessage(lb, WM_PRINT, reinterpret_cast<WPARAM>(bitmapDC), PRF_CLIENT|PRF_NONCLIENT);
+
+    // x-studio365 spec: Notify skin_sb draw the custom style scroll bars
+    ::SendMessage(lb, WM_USER + 201, reinterpret_cast<WPARAM>(bitmapDC), 0);
+
 	::BitBlt(hDC, 0, 0, extent.x, extent.y, bitmapDC, 0, 0, SRCCOPY);
 	// Select a stock brush to prevent warnings from BoundsChecker
 	::SelectObject(bitmapDC, GetStockFont(WHITE_BRUSH));
