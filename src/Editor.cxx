@@ -4881,6 +4881,8 @@ void Editor::ButtonUpWithModifiers(Point pt, unsigned int curTime, int modifiers
 		newCharPos = MovePositionOutsideChar(newCharPos, -1);
 		NotifyHotSpotReleaseClick(newCharPos.Position(), modifiers & SCI_CTRL);
 	}
+	// x-studio365 spec
+        NotifyMarginReleaseClick(pt, modifiers /*(modifiers & SCI_CTRL) ? SCI_CTRL : 0*/ );
 	if (HaveMouseCapture()) {
 		if (PointInSelMargin(pt)) {
 			DisplayCursor(GetMarginCursor(pt));
