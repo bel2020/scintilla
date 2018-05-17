@@ -59,6 +59,10 @@
 #define LOAD_LIBRARY_SEARCH_SYSTEM32 0x00000800
 #endif
 
+// x-studio365 spec spec, vs-like style autoc window
+#define LBX_WIDTH 210
+#define LBX_HEIGHT 192
+
 namespace Scintilla {
 
 UINT CodePageFromCharSet(DWORD characterSet, UINT documentCodePage);
@@ -2139,13 +2143,15 @@ void ListBoxX::Create(Window &parent_, int ctrlID_, Point location_, int lineHei
 	HWND hwndParent = HwndFromWindowID(parent->GetID());
 	HINSTANCE hinstanceParent = GetWindowInstance(hwndParent);
 	// Window created as popup so not clipped within parent client area
-	wid = ::CreateWindowEx(
-		WS_EX_WINDOWEDGE, ListBoxX_ClassName, TEXT(""),
-		WS_POPUP | WS_THICKFRAME,
-		100,100, 150,80, hwndParent,
-		NULL,
-		hinstanceParent,
-		this);
+	
+    // x-studio365 spec spec, vs-like autoc window
+    wid = ::CreateWindowEx(
+        WS_EX_WINDOWEDGE, ListBoxX_ClassName, TEXT(""),
+        WS_POPUP | WS_BORDER,
+        100, 100, LBX_WIDTH, LBX_HEIGHT, hwndParent,
+        NULL,
+        hinstanceParent,
+        this);
 
 	POINT locationw = {static_cast<LONG>(location.x), static_cast<LONG>(location.y)};
 	::MapWindowPoints(hwndParent, NULL, &locationw, 1);
