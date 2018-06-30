@@ -430,6 +430,7 @@ typedef sptr_t (*SciFnDirect)(sptr_t ptr, unsigned int iMessage, uptr_t wParam, 
 #define SCI_CUT 2177
 #define SCI_COPY 2178
 #define SCI_PASTE 2179
+#define SCI_GETMARGINFROMPOINT 2554 // x-studio365 spec
 #define SCI_QUICK_PASTE 2555 // x-studio365 spec
 #define SCI_CLEAR 2180
 #define SCI_SETTEXT 2181

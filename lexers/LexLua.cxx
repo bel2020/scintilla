@@ -27,6 +27,8 @@
 #include "StyleContext.h"
 #include "CharacterSet.h"
 #include "LexerModule.h"
+#include "Accessor.h"
+#include "PropSetSimple.h"
 
 using namespace Scintilla;
 
@@ -34,12 +36,12 @@ using namespace Scintilla;
 // return 1 for [[ or ]], returns >=2 for [=[ or ]=] and so on.
 // The maximum number of '=' characters allowed is 254.
 static int LongDelimCheck(StyleContext &sc) {
-	int sep = 1;
-	while (sc.GetRelative(sep) == '=' && sep < 0xFF)
-		sep++;
-	if (sc.GetRelative(sep) == sc.ch)
-		return sep;
-	return 0;
+    int sep = 1;
+    while (sc.GetRelative(sep) == '=' && sep < 0xFF)
+        sep++;
+    if (sc.GetRelative(sep) == sc.ch)
+        return sep;
+    return 0;
 }
 
 static void ColouriseLuaDoc(
@@ -99,11 +101,13 @@ static void ColouriseLuaDoc(
     }
 
     // results of identifier/keyword matching
-    Sci_Position idenPos = 0;
-    Sci_Position idenWordPos = 0;
-    int idenStyle = SCE_LUA_IDENTIFIER;
-    bool foundGoto = false;
-    bool foundFunction = false; // x-studio365 spec
+    //Sci_Position idenPos = 0;
+    //Sci_Position idenWordPos = 0;
+    //int idenStyle = SCE_LUA_IDENTIFIER;
+    //bool foundGoto = false;
+
+    //// x-studio365 spec
+    //bool foundFunction = false; 
 
     // Do not leak onto next line
     if (initStyle == SCE_LUA_STRINGEOL || initStyle == SCE_LUA_COMMENTLINE || initStyle == SCE_LUA_PREPROCESSOR) {
@@ -203,40 +207,65 @@ static void ColouriseLuaDoc(
             }
         }
         else if (sc.state == SCE_LUA_IDENTIFIER) {
-            idenPos--;			// commit already-scanned identitier/word parts
-            if (idenWordPos > 0) {
-                idenWordPos--;
-                sc.ChangeState(idenStyle);
-                sc.ForwardBytes(idenWordPos);
-                idenPos -= idenWordPos;
-                if (idenPos > 0) {
-                    sc.SetState(SCE_LUA_IDENTIFIER);
-                    sc.ForwardBytes(idenPos);
+            if (!(setWord.Contains(sc.ch) /*|| sc.ch == '.'*/)/* || sc.Match('.', '.')*/) {
+                char s[100];
+                sc.GetCurrent(s, sizeof(s));
+                if (keywords.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD);
+                    if (strcmp(s, "goto") == 0) {	// goto <label> forward scan
+                        sc.SetState(SCE_LUA_DEFAULT);
+                        while (IsASpaceOrTab(sc.ch) && !sc.atLineEnd)
+                            sc.Forward();
+                        if (setWordStart.Contains(sc.ch)) {
+                            sc.SetState(SCE_LUA_LABEL);
+                            sc.Forward();
+                            while (setWord.Contains(sc.ch))
+                                sc.Forward();
+                            sc.GetCurrent(s, sizeof(s));
+                            if (keywords.InList(s))
+                                sc.ChangeState(SCE_LUA_WORD);
+                        }
+                        sc.SetState(SCE_LUA_DEFAULT);
+                    }
+                    else if (strcmp(s, "function") == 0) { // x-studio365 spec, function <name> forward scan, Ah, so easy, send a pull request?
+                        if (currentSyntaxContext.state == SyntaxState::normal)
+                        { // x-sutdio365 spec: function name expected
+                            currentSyntaxContext.state = SyntaxState::funcdef_name;
+                        }
+                        sc.SetState(SCE_LUA_DEFAULT);
+                    }
                 }
-            }
-            else {
-                sc.ForwardBytes(idenPos);
-            }
-            sc.SetState(SCE_LUA_DEFAULT);
-            if (foundGoto) {					// goto <label> forward scan
-                while (IsASpaceOrTab(sc.ch) && !sc.atLineEnd)
-                    sc.Forward();
-                if (setWordStart.Contains(sc.ch)) {
-                    sc.SetState(SCE_LUA_LABEL);
-                    sc.Forward();
-                    while (setWord.Contains(sc.ch))
-                        sc.Forward();
-                    char s[100];
-                    sc.GetCurrent(s, sizeof(s));
-                    if (keywords.InList(s))		// labels cannot be keywords
-                        sc.ChangeState(SCE_LUA_WORD);
+                else if (keywords2.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD2);
                 }
-                sc.SetState(SCE_LUA_DEFAULT);
-            }
-            else if (foundFunction) { // x-studio365 spec, function <name> forward scan, Ah, so easy, send a pull request?
-                if (currentSyntaxContext.state == SyntaxState::normal)
-                { // x-sutdio365 spec: function name expected
-                    currentSyntaxContext.state = SyntaxState::funcdef_name;
+                else if (keywords3.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD3);
+                }
+                else if (keywords4.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD4);
+                }
+                else if (keywords5.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD5);
+                }
+                else if (keywords6.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD6);
+                }
+                else if (keywords7.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD7);
+                }
+                else if (keywords8.InList(s)) {
+                    sc.ChangeState(SCE_LUA_WORD8);
+                }
+                else { // x-studio365 spec
+                    switch (currentSyntaxContext.state) {
+                    case SyntaxState::funcdef_name:
+                        sc.ChangeState(SCE_LUA_FUNCTION_NAME);
+                        break;
+                    case SyntaxState::funcdef_param:
+                        sc.ChangeState(SCE_LUA_FUNCTION_PARAM);
+                        break;
+                    default:;
+                    }
                 }
                 sc.SetState(SCE_LUA_DEFAULT);
             }
@@ -300,292 +329,242 @@ static void ColouriseLuaDoc(
                     }
                 }
             }
-                else if (sc.ch == ']') {
-                    int sep = LongDelimCheck(sc);
-                    if (sep == 1 && sepCount == 1) {    // un-nest with ]]-only
-                        if (nestLevel > 0) {  // https://github.com/halx99/x-studio365/issues/259
-                            nestLevel--;
-                            sc.Forward();
-                            if (nestLevel == 0) {
-                                sc.ForwardSetState(SCE_LUA_DEFAULT);
-                            }
+            else if (sc.ch == ']') {
+                int sep = LongDelimCheck(sc);
+                if (sep == 1 && sepCount == 1) {    // un-nest with ]]-only
+                    if (nestLevel > 0) {  // https://github.com/halx99/x-studio365/issues/259
+                        nestLevel--;
+                        sc.Forward();
+                        if (nestLevel == 0) {
+                            sc.ForwardSetState(SCE_LUA_DEFAULT);
                         }
                     }
-                    else if (sep > 1 && sep == sepCount) {   // ]=]-style delim
-                        sc.Forward(sep);
-                        sc.ForwardSetState(SCE_LUA_DEFAULT);
-                    }
+                }
+                else if (sep > 1 && sep == sepCount) {   // ]=]-style delim
+                    sc.Forward(sep);
+                    sc.ForwardSetState(SCE_LUA_DEFAULT);
                 }
             }
+        }
 
-            // Determine if a new state should be entered.
-            if (sc.state == SCE_LUA_DEFAULT) {
-                if (IsADigit(sc.ch) || (sc.ch == '.' && IsADigit(sc.chNext))) {
-                    sc.SetState(SCE_LUA_NUMBER);
-                    if (sc.ch == '0' && toupper(sc.chNext) == 'X') {
-                        sc.Forward();
-                    }
+        // Determine if a new state should be entered.
+        if (sc.state == SCE_LUA_DEFAULT) {
+            if (IsADigit(sc.ch) || (sc.ch == '.' && IsADigit(sc.chNext))) {
+                sc.SetState(SCE_LUA_NUMBER);
+                if (sc.ch == '0' && toupper(sc.chNext) == 'X') {
+                    sc.Forward();
                 }
-                else if (setWordStart.Contains(sc.ch)) {
-                    // For matching various identifiers with dots and colons, multiple
-                    // matches are done as identifier segments are added. Longest match is
-                    // set to a word style. The non-matched part is in identifier style.
-                    std::string ident;
-                    idenPos = 0;
-                    idenWordPos = 0;
-                    idenStyle = SCE_LUA_IDENTIFIER;
-                    foundGoto = false;
-                    foundFunction = false;
-                    int cNext;
-                    do {
-                        int c;
-                        const Sci_Position idenPosOld = idenPos;
-                        std::string identSeg;
-                        identSeg += static_cast<char>(sc.GetRelative(idenPos++));
-                        while (setWord.Contains(c = sc.GetRelative(idenPos))) {
-                            identSeg += static_cast<char>(c);
-                            idenPos++;
-                        }
-                        if (keywords.InList(identSeg.c_str()) && (idenPosOld > 0)) {
-                            idenPos = idenPosOld - 1;	// keywords cannot mix
-                            ident.pop_back();
-                            break;
-                        }
-                        ident += identSeg;
-                        const char* s = ident.c_str();
-                        int newStyle = SCE_LUA_IDENTIFIER;
-                        if (keywords.InList(s)) {
-                            newStyle = SCE_LUA_WORD;
-                        }
-                        else if (keywords2.InList(s)) {
-                            newStyle = SCE_LUA_WORD2;
-                        }
-                        else if (keywords3.InList(s)) {
-                            newStyle = SCE_LUA_WORD3;
-                        }
-                        else if (keywords4.InList(s)) {
-                            newStyle = SCE_LUA_WORD4;
-                        }
-                        else if (keywords5.InList(s)) {
-                            newStyle = SCE_LUA_WORD5;
-                        }
-                        else if (keywords6.InList(s)) {
-                            newStyle = SCE_LUA_WORD6;
-                        }
-                        else if (keywords7.InList(s)) {
-                            newStyle = SCE_LUA_WORD7;
-                        }
-                        else if (keywords8.InList(s)) {
-                            newStyle = SCE_LUA_WORD8;
-                        }
-                        else {
-                            switch (currentSyntaxContext.state) { // x-studio365 spec
-                            case SyntaxState::funcdef_name:
-                                newStyle = SCE_LUA_FUNCTION_NAME;
-                                break;
-                            case SyntaxState::funcdef_param:
-                                newStyle = SCE_LUA_FUNCTION_PARAM;
-                                break;
-                            default:;
-                            }
-                        }
-                        if (newStyle != SCE_LUA_IDENTIFIER) {
-                            idenStyle = newStyle;
-                            idenWordPos = idenPos;
-                        }
-                        if (idenStyle == SCE_LUA_WORD)	// keywords cannot mix
-                            break;
-                        cNext = sc.GetRelative(idenPos + 1);
-                        if ((c == '.' || c == ':') && setWordStart.Contains(cNext)) {
-                            ident += static_cast<char>(c);
-                            idenPos++;
-                        }
-                        else {
-                            cNext = 0;
-                        }
-                    } while (cNext);
-                    if (idenStyle == SCE_LUA_WORD) {
-                        if (ident.compare("goto") == 0)
-                            foundGoto = true;
-                        else if (ident.compare("function") == 0)
-                            foundFunction = true;
-                    }
-                    sc.SetState(SCE_LUA_IDENTIFIER);
+            }
+            else if (setWordStart.Contains(sc.ch)) {
+                sc.SetState(SCE_LUA_IDENTIFIER);
+            }
+            else if (sc.ch == '\"') {
+                sc.SetState(SCE_LUA_STRING);
+                stringWs = 0;
+            }
+            else if (sc.ch == '\'') {
+                sc.SetState(SCE_LUA_CHARACTER);
+                stringWs = 0;
+            }
+            else if (sc.ch == '[') {
+                sepCount = LongDelimCheck(sc);
+                if (sepCount == 0) {
+                    sc.SetState(SCE_LUA_OPERATOR);
                 }
-                else if (sc.ch == '\"') {
-                    sc.SetState(SCE_LUA_STRING);
-                    stringWs = 0;
+                else {
+                    nestLevel = 1;
+                    sc.SetState(SCE_LUA_LITERALSTRING);
+                    sc.Forward(sepCount);
                 }
-                else if (sc.ch == '\'') {
-                    sc.SetState(SCE_LUA_CHARACTER);
-                    stringWs = 0;
-                }
-                else if (sc.ch == '[') {
+            }
+            else if (sc.Match('-', '-')) {
+                sc.SetState(SCE_LUA_COMMENTLINE);
+                if (sc.Match("--[")) {
+                    sc.Forward(2);
                     sepCount = LongDelimCheck(sc);
-                    if (sepCount == 0) {
-                        sc.SetState(SCE_LUA_OPERATOR);
-                    }
-                    else {
+                    if (sepCount > 0) {
                         nestLevel = 1;
-                        sc.SetState(SCE_LUA_LITERALSTRING);
+                        sc.ChangeState(SCE_LUA_COMMENT);
                         sc.Forward(sepCount);
                     }
                 }
-                else if (sc.Match('-', '-')) {
-                    sc.SetState(SCE_LUA_COMMENTLINE);
-                    if (sc.Match("--[")) {
-                        sc.Forward(2);
-                        sepCount = LongDelimCheck(sc);
-                        if (sepCount > 0) {
-                            nestLevel = 1;
-                            sc.ChangeState(SCE_LUA_COMMENT);
-                            sc.Forward(sepCount);
-                        }
-                    }
-                    else {
-                        sc.Forward();
-                    }
+                else {
+                    sc.Forward();
                 }
-                else if (sc.atLineStart && sc.Match('$')) {
-                    sc.SetState(SCE_LUA_PREPROCESSOR);	// Obsolete since Lua 4.0, but still in old code
-                }
-                else if (setLuaOperator.Contains(sc.ch)) {
-                    sc.SetState(SCE_LUA_OPERATOR);
-                    switch (sc.ch) { // x-studio365 spec spec: function param Colourise support.
-                    case '(':
-                        if (currentSyntaxContext.state == SyntaxState::funcdef_name)
-                            currentSyntaxContext.state = SyntaxState::funcdef_param;
-                        break;
-                    case ')':
-                        if (currentSyntaxContext.state == SyntaxState::funcdef_param)
-                            currentSyntaxContext.state = SyntaxState::normal;
-                        break;
-                    }
+            }
+            else if (sc.atLineStart && sc.Match('$')) {
+                sc.SetState(SCE_LUA_PREPROCESSOR);	// Obsolete since Lua 4.0, but still in old code
+            }
+            else if (setLuaOperator.Contains(sc.ch)) {
+                sc.SetState(SCE_LUA_OPERATOR);
+                switch (sc.ch) { // x-studio365 spec spec: function param Colourise support.
+                case '(':
+                    if (currentSyntaxContext.state == SyntaxState::funcdef_name)
+                        currentSyntaxContext.state = SyntaxState::funcdef_param;
+                    break;
+                case ')':
+                    if (currentSyntaxContext.state == SyntaxState::funcdef_param)
+                        currentSyntaxContext.state = SyntaxState::normal;
+                    break;
                 }
             }
         }
+    }
 
-        if (styler.pprops != nullptr) { // x-studio365 spec
-            char buf[8];
-            sprintf(buf, "%d", static_cast<int>(currentSyntaxContext.state));
-            //styler.pprops->Set("syntax.state", buf);
+    if (setWord.Contains(sc.chPrev) || sc.chPrev == '.') {
+        char s[100];
+        sc.GetCurrent(s, sizeof(s));
+        if (keywords.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD);
         }
+        else if (keywords2.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD2);
+        }
+        else if (keywords3.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD3);
+        }
+        else if (keywords4.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD4);
+        }
+        else if (keywords5.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD5);
+        }
+        else if (keywords6.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD6);
+        }
+        else if (keywords7.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD7);
+        }
+        else if (keywords8.InList(s)) {
+            sc.ChangeState(SCE_LUA_WORD8);
+        }
+    }
 
-        sc.Complete();
+    if (styler.pprops != nullptr) { // x-studio365 spec
+        char buf[8];
+        int n = sprintf(buf, "%d", static_cast<int>(currentSyntaxContext.state));
+        styler.pprops->Set("syntax.state", buf, sizeof("syntax.state") - 1, n);
+    }
+
+    sc.Complete();
 }
 
 static void FoldLuaDoc(Sci_PositionU startPos, Sci_Position length, int /* initStyle */, WordList *[],
-                       Accessor &styler) {
-	const Sci_PositionU lengthDoc = startPos + length;
-	int visibleChars = 0;
-	Sci_Position lineCurrent = styler.GetLine(startPos);
-	int levelPrev = styler.LevelAt(lineCurrent) & SC_FOLDLEVELNUMBERMASK;
-	int levelCurrent = levelPrev;
-	char chNext = styler[startPos];
-	const bool foldCompact = styler.GetPropertyInt("fold.compact", 1) != 0;
-	int styleNext = styler.StyleAt(startPos);
+    Accessor &styler) {
+    const Sci_PositionU lengthDoc = startPos + length;
+    int visibleChars = 0;
+    Sci_Position lineCurrent = styler.GetLine(startPos);
+    int levelPrev = styler.LevelAt(lineCurrent) & SC_FOLDLEVELNUMBERMASK;
+    int levelCurrent = levelPrev;
+    char chNext = styler[startPos];
+    const bool foldCompact = styler.GetPropertyInt("fold.compact", 1) != 0;
+    int styleNext = styler.StyleAt(startPos);
 
-	for (Sci_PositionU i = startPos; i < lengthDoc; i++) {
-		const char ch = chNext;
-		chNext = styler.SafeGetCharAt(i + 1);
-		const int style = styleNext;
-		styleNext = styler.StyleAt(i + 1);
-		const bool atEOL = (ch == '\r' && chNext != '\n') || (ch == '\n');
-		if (style == SCE_LUA_WORD) {
-			if (ch == 'i' || ch == 'd' || ch == 'f' || ch == 'e' || ch == 'r' || ch == 'u') {
-				char s[10] = "";
-				for (Sci_PositionU j = 0; j < 8; j++) {
-					if (!iswordchar(styler[i + j])) {
-						break;
-					}
-					s[j] = styler[i + j];
-					s[j + 1] = '\0';
-				}
+    for (Sci_PositionU i = startPos; i < lengthDoc; i++) {
+        const char ch = chNext;
+        chNext = styler.SafeGetCharAt(i + 1);
+        const int style = styleNext;
+        styleNext = styler.StyleAt(i + 1);
+        const bool atEOL = (ch == '\r' && chNext != '\n') || (ch == '\n');
+        if (style == SCE_LUA_WORD) {
+            if (ch == 'i' || ch == 'd' || ch == 'f' || ch == 'e' || ch == 'r' || ch == 'u') {
+                char s[10] = "";
+                for (Sci_PositionU j = 0; j < 8; j++) {
+                    if (!iswordchar(styler[i + j])) {
+                        break;
+                    }
+                    s[j] = styler[i + j];
+                    s[j + 1] = '\0';
+                }
 
-				if ((strcmp(s, "if") == 0) || (strcmp(s, "do") == 0) || (strcmp(s, "function") == 0) || (strcmp(s, "repeat") == 0)) {
-					levelCurrent++;
-				}
-				if ((strcmp(s, "end") == 0) || (strcmp(s, "elseif") == 0) || (strcmp(s, "until") == 0)) {
-					levelCurrent--;
-				}
-			}
-		} else if (style == SCE_LUA_OPERATOR) {
-			if (ch == '{' || ch == '(') {
-				levelCurrent++;
-			} else if (ch == '}' || ch == ')') {
-				levelCurrent--;
-			}
-		} else if (style == SCE_LUA_LITERALSTRING || style == SCE_LUA_COMMENT) {
-			if (ch == '[') {
-				levelCurrent++;
-			} else if (ch == ']') {
-				levelCurrent--;
-			}
-		}
+                if ((strcmp(s, "if") == 0) || (strcmp(s, "do") == 0) || (strcmp(s, "function") == 0) || (strcmp(s, "repeat") == 0)) {
+                    levelCurrent++;
+                }
+                if ((strcmp(s, "end") == 0) || (strcmp(s, "elseif") == 0) || (strcmp(s, "until") == 0)) {
+                    levelCurrent--;
+                }
+            }
+        }
+        else if (style == SCE_LUA_OPERATOR) {
+            if (ch == '{' || ch == '(') {
+                levelCurrent++;
+            }
+            else if (ch == '}' || ch == ')') {
+                levelCurrent--;
+            }
+        }
+        else if (style == SCE_LUA_LITERALSTRING || style == SCE_LUA_COMMENT) {
+            if (ch == '[') {
+                levelCurrent++;
+            }
+            else if (ch == ']') {
+                levelCurrent--;
+            }
+        }
 
-		if (atEOL) {
-			int lev = levelPrev;
-			if (visibleChars == 0 && foldCompact) {
-				lev |= SC_FOLDLEVELWHITEFLAG;
-			}
-			if ((levelCurrent > levelPrev) && (visibleChars > 0)) {
-				lev |= SC_FOLDLEVELHEADERFLAG;
-			}
-			if (lev != styler.LevelAt(lineCurrent)) {
-				styler.SetLevel(lineCurrent, lev);
-			}
-			lineCurrent++;
-			levelPrev = levelCurrent;
-			visibleChars = 0;
-		}
-		if (!isspacechar(ch)) {
-			visibleChars++;
-		}
-	}
-	// Fill in the real level of the next line, keeping the current flags as they will be filled in later
+        if (atEOL) {
+            int lev = levelPrev;
+            if (visibleChars == 0 && foldCompact) {
+                lev |= SC_FOLDLEVELWHITEFLAG;
+            }
+            if ((levelCurrent > levelPrev) && (visibleChars > 0)) {
+                lev |= SC_FOLDLEVELHEADERFLAG;
+            }
+            if (lev != styler.LevelAt(lineCurrent)) {
+                styler.SetLevel(lineCurrent, lev);
+            }
+            lineCurrent++;
+            levelPrev = levelCurrent;
+            visibleChars = 0;
+        }
+        if (!isspacechar(ch)) {
+            visibleChars++;
+        }
+    }
+    // Fill in the real level of the next line, keeping the current flags as they will be filled in later
 
-	int flagsNext = styler.LevelAt(lineCurrent) & ~SC_FOLDLEVELNUMBERMASK;
-	styler.SetLevel(lineCurrent, levelPrev | flagsNext);
+    int flagsNext = styler.LevelAt(lineCurrent) & ~SC_FOLDLEVELNUMBERMASK;
+    styler.SetLevel(lineCurrent, levelPrev | flagsNext);
 }
 
 static const char * const luaWordListDesc[] = {
-	"Keywords",
-	"Basic functions",
-	"String, (table) & math functions",
-	"(coroutines), I/O & system facilities",
-	"user1",
-	"user2",
-	"user3",
-	"user4",
-	0
+    "Keywords",
+    "Basic functions",
+    "String, (table) & math functions",
+    "(coroutines), I/O & system facilities",
+    "user1",
+    "user2",
+    "user3",
+    "user4",
+    0
 };
 
 namespace {
 
-LexicalClass lexicalClasses[] = {
-	// Lexer Lua SCLEX_LUA SCE_LUA_:
-	0, "SCE_LUA_DEFAULT", "default", "White space: Visible only in View Whitespace mode (or if it has a back colour)",
-	1, "SCE_LUA_COMMENT", "comment", "Block comment (Lua 5.0)",
-	2, "SCE_LUA_COMMENTLINE", "comment line", "Line comment",
-	3, "SCE_LUA_COMMENTDOC", "comment documentation", "Doc comment -- Not used in Lua (yet?)",
-	4, "SCE_LUA_NUMBER", "literal numeric", "Number",
-	5, "SCE_LUA_WORD", "keyword", "Keyword",
-	6, "SCE_LUA_STRING", "literal string", "(Double quoted) String",
-	7, "SCE_LUA_CHARACTER", "literal string character", "Character (Single quoted string)",
-	8, "SCE_LUA_LITERALSTRING", "literal string", "Literal string",
-	9, "SCE_LUA_PREPROCESSOR", "preprocessor", "Preprocessor (obsolete in Lua 4.0 and up)",
-	10, "SCE_LUA_OPERATOR", "operator", "Operators",
-	11, "SCE_LUA_IDENTIFIER", "identifier", "Identifier (everything else...)",
-	12, "SCE_LUA_STRINGEOL", "error literal string", "End of line where string is not closed",
-	13, "SCE_LUA_WORD2", "identifier", "Other keywords",
-	14, "SCE_LUA_WORD3", "identifier", "Other keywords",
-	15, "SCE_LUA_WORD4", "identifier", "Other keywords",
-	16, "SCE_LUA_WORD5", "identifier", "Other keywords",
-	17, "SCE_LUA_WORD6", "identifier", "Other keywords",
-	18, "SCE_LUA_WORD7", "identifier", "Other keywords",
-	19, "SCE_LUA_WORD8", "identifier", "Other keywords",
-	20, "SCE_LUA_LABEL", "label", "Labels",
-};
+    LexicalClass lexicalClasses[] = {
+        // Lexer Lua SCLEX_LUA SCE_LUA_:
+        0, "SCE_LUA_DEFAULT", "default", "White space: Visible only in View Whitespace mode (or if it has a back colour)",
+        1, "SCE_LUA_COMMENT", "comment", "Block comment (Lua 5.0)",
+        2, "SCE_LUA_COMMENTLINE", "comment line", "Line comment",
+        3, "SCE_LUA_COMMENTDOC", "comment documentation", "Doc comment -- Not used in Lua (yet?)",
+        4, "SCE_LUA_NUMBER", "literal numeric", "Number",
+        5, "SCE_LUA_WORD", "keyword", "Keyword",
+        6, "SCE_LUA_STRING", "literal string", "(Double quoted) String",
+        7, "SCE_LUA_CHARACTER", "literal string character", "Character (Single quoted string)",
+        8, "SCE_LUA_LITERALSTRING", "literal string", "Literal string",
+        9, "SCE_LUA_PREPROCESSOR", "preprocessor", "Preprocessor (obsolete in Lua 4.0 and up)",
+        10, "SCE_LUA_OPERATOR", "operator", "Operators",
+        11, "SCE_LUA_IDENTIFIER", "identifier", "Identifier (everything else...)",
+        12, "SCE_LUA_STRINGEOL", "error literal string", "End of line where string is not closed",
+        13, "SCE_LUA_WORD2", "identifier", "Other keywords",
+        14, "SCE_LUA_WORD3", "identifier", "Other keywords",
+        15, "SCE_LUA_WORD4", "identifier", "Other keywords",
+        16, "SCE_LUA_WORD5", "identifier", "Other keywords",
+        17, "SCE_LUA_WORD6", "identifier", "Other keywords",
+        18, "SCE_LUA_WORD7", "identifier", "Other keywords",
+        19, "SCE_LUA_WORD8", "identifier", "Other keywords",
+        20, "SCE_LUA_LABEL", "label", "Labels",
+    };
 
 }
 

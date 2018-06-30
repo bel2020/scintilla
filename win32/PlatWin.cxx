@@ -59,9 +59,12 @@
 #define LOAD_LIBRARY_SEARCH_SYSTEM32 0x00000800
 #endif
 
-// x-studio365 spec spec, vs-like style autoc window
+// x-studio365 spec, vs-like style autoc window
 #define LBX_WIDTH 210
 #define LBX_HEIGHT 192
+
+// x-studio365 spec
+#define WM_POST_PRINT WM_USER + 201
 
 namespace Scintilla {
 
@@ -2744,7 +2747,7 @@ void ListBoxX::Paint(HDC hDC) {
 	::SendMessage(lb, WM_PRINT, reinterpret_cast<WPARAM>(bitmapDC), PRF_CLIENT|PRF_NONCLIENT);
 
     // x-studio365 spec: Notify skin_sb draw the custom style scroll bars
-    ::SendMessage(lb, WM_USER + 201, reinterpret_cast<WPARAM>(bitmapDC), 0);
+    ::SendMessage(lb, WM_POST_PRINT, reinterpret_cast<WPARAM>(bitmapDC), 0);
 
 	::BitBlt(hDC, 0, 0, extent.x, extent.y, bitmapDC, 0, 0, SRCCOPY);
 	// Select a stock brush to prevent warnings from BoundsChecker

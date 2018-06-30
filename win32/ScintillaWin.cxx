@@ -1760,6 +1760,13 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 		case SCI_GRABFOCUS:
 			::SetFocus(MainHWND());
 			break;
+        case SCI_GETMARGINFROMPOINT: // x-studio365  spec
+            (void)0; {
+                POINT rpt = { static_cast<int>(wParam), static_cast<int>(lParam) };
+                ::ScreenToClient(MainHWND(), &rpt);
+                const Point ptClient = PointFromPOINT(rpt);
+                return PointInSelMargin(ptClient);
+            }
 
 #ifdef INCLUDE_DEPRECATED_FEATURES
 		case SCI_SETKEYSUNICODE:

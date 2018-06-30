@@ -515,7 +515,7 @@ void ScintillaBase::ContextMenu(Point pt) {
 		const bool writable = !WndProc(SCI_GETREADONLY, 0, 0);
 		popup.CreatePopUp();
 		// x-studio365 spec
-        AddToPopUp("Change All Occurrences\tCtrl+F2", idcmdSelectAll+1, writable && !sel.Empty());
+        AddToPopUp("Clear All", idcmdSelectAll+1, writable && !sel.Empty());
         AddToPopUp("");
 		AddToPopUp("Undo", idcmdUndo, writable && pdoc->CanUndo());
 		AddToPopUp("Redo", idcmdRedo, writable && pdoc->CanRedo());
