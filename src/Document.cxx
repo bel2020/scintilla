@@ -4,6 +4,8 @@
  **/
 // Copyright 1998-2011 by Neil Hodgson <neilh@scintilla.org>
 // The License.txt file describes the conditions under which this software may be distributed.
+#define USING_BOOST_REGEX 1
+#define REGEX_MULTILINE
 
 #include <cstddef>
 #include <cstdlib>
@@ -45,6 +47,7 @@
 #include "RESearch.h"
 #include "UniConversion.h"
 #include "ElapsedPeriod.h"
+#include "BoostRegexSearch.h"
 
 using namespace Scintilla;
 
@@ -1850,8 +1853,13 @@ Document::CharacterExtracted Document::ExtractCharacter(Sci::Position position) 
  * searches (just pass minPos > maxPos to do a backward search)
  * Has not been tested with backwards DBCS searches yet.
  */
+namespace Scintilla
+{
+    extern RegexSearchBase *CreateBoostRegexSearch(CharClassify* /* charClassTable */);
+}
 Sci::Position Document::FindText(Sci::Position minPos, Sci::Position maxPos, const char *search,
                         int flags, Sci::Position *length) {
+
 	if (*length <= 0)
 		return minPos;
 	const bool caseSensitive = (flags & SCFIND_MATCHCASE) != 0;
@@ -1859,8 +1867,15 @@ Sci::Position Document::FindText(Sci::Position minPos, Sci::Position maxPos, con
 	const bool wordStart = (flags & SCFIND_WORDSTART) != 0;
 	const bool regExp = (flags & SCFIND_REGEXP) != 0;
 	if (regExp) {
-		if (!regex)
-			regex = std::unique_ptr<RegexSearchBase>(CreateRegexSearch(&charClass));
+        // regex =  std::unique_ptr<RegexSearchBase>((flags & SCFIND_BOOSTREGEX) ? CreateBoostRegexSearch(&charClass) : CreateRegexSearch(&charClass));
+        if (!regex) {
+#if USING_BOOST_REGEX
+            regex = std::unique_ptr<RegexSearchBase>(CreateBoostRegexSearch(&charClass)); 
+#else
+            regex = std::unique_ptr<RegexSearchBase>(CreateRegexSearch(&charClass));
+#endif
+        }
+        
 		return regex->FindText(this, minPos, maxPos, search, caseSensitive, word, wordStart, flags, length);
 	} else {
 
@@ -2872,14 +2887,16 @@ bool MatchOnLines(const Document *doc, const Regex &regexp, const RESearchRange 
 	bool matched = false;
 	std::match_results<Iterator> match;
 
-	// MSVC and libc++ have problems with ^ and $ matching line ends inside a range
-	// If they didn't then the line by line iteration could be removed for the forwards
-	// case and replaced with the following 4 lines:
-	//	Iterator uiStart(doc, startPos);
-	//	Iterator uiEnd(doc, endPos);
-	//	flagsMatch = MatchFlags(doc, startPos, endPos);
-	//	matched = std::regex_search(uiStart, uiEnd, match, regexp, flagsMatch);
-#if 1 // x-studio365 spec: improve regex search
+    // MSVC and libc++ have problems with ^ and $ matching line ends inside a range.
+    // CRLF line ends are also a problem as ^ and $ only treat LF as a line end.
+    // The std::regex::multiline option was added to C++17 to improve behaviour but
+    // has not been implemented by compiler runtimes with MSVC always in multiline
+    // mode and libc++ and libstdc++ always in single-line mode.
+    // If multiline regex worked well then the line by line iteration could be removed
+    // for the forwards case and replaced with the following 4 lines:
+    // @HALX99: Well, MSVC, if no REGEX_MULTILINE, the regex search does not support match CRLF.
+    // see: https://github.com/halx99/x-studio365/issues/225
+#ifdef REGEX_MULTILINE
     Iterator uiStart(doc, resr.startPos);
     Iterator uiEnd(doc, resr.endPos);
     std::regex_constants::match_flag_type flagsMatch = MatchFlags(doc, resr.startPos, resr.endPos);
