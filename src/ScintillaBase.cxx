@@ -1105,8 +1105,8 @@ sptr_t ScintillaBase::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lPara
 		          ConstCharPtrFromSPtr(lParam));
 		break;
 
-	case SCI_GETPROPERTY:
-		return StringResult(lParam, DocumentLexState()->PropGet(ConstCharPtrFromUPtr(wParam)));
+	case SCI_GETPROPERTY: // x-studio365 spec.
+        return reinterpret_cast<sptr_t>(DocumentLexState()->PropGet(ConstCharPtrFromUPtr(wParam))); // StringResult(lParam, DocumentLexState()->PropGet(ConstCharPtrFromUPtr(wParam)));
 
 	case SCI_GETPROPERTYEXPANDED:
 		return DocumentLexState()->PropGetExpanded(ConstCharPtrFromUPtr(wParam),

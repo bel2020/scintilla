@@ -1768,7 +1768,7 @@ void Editor::Paint(Surface *surfaceWindow, PRectangle rcArea) {
 		}
 	}
 
-	NotifyPainted();
+	NotifyPainted(surfaceWindow);
 }
 
 // This is mostly copied from the Paint method but with some things omitted
@@ -2120,6 +2120,21 @@ void Editor::Cut() {
 	}
 }
 
+void Editor::LineCut()
+{ // x-studio365 spec
+    pdoc->CheckReadOnly();
+    if (!pdoc->IsReadOnly() && !SelectionContainsProtected()) {
+        if (!sel.Empty()) {
+            SelectionText selectedText;
+            CopySelectionRange(&selectedText);
+
+            selectedText.lineCopy = true;
+            CopyToClipboard(selectedText);
+        }
+        ClearSelection();
+    }
+}
+
 void Editor::PasteRectangular(SelectionPosition pos, const char *ptr, Sci::Position len) {
 	if (pdoc->IsReadOnly() || SelectionContainsProtected()) {
 		return;
@@ -2376,9 +2391,10 @@ bool Editor::NotifyUpdateUI() {
 	return false;
 }
 
-void Editor::NotifyPainted() {
+void Editor::NotifyPainted(Surface* surfaceWindow) {
 	SCNotification scn = {};
 	scn.nmhdr.code = SCN_PAINTED;
+    scn.wParam = (uptr_t)surfaceWindow;
 	NotifyParent(scn);
 }
 
@@ -3870,7 +3886,7 @@ int Editor::KeyCommand(unsigned int iMessage) {
 			const Sci::Position start = pdoc->LineStart(lineStart);
 			const Sci::Position end = pdoc->LineStart(lineEnd + 1);
 			SetSelection(start, end);
-			Cut();
+            LineCut(); // x-studio365 spec, orig code: Cut();
 			SetLastXChosen();
 		}
 		break;
@@ -8217,18 +8233,16 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 	case SCI_COUNTCHARACTERS:
 		return pdoc->CountCharacters(static_cast<Sci::Position>(wParam), lParam);
 
-    case 9000: // x-studio365 spec: TODO: define as macro 
-        // 
-        do {
-            // Send notification
-            SCNotification scn = {};
-            scn.nmhdr.code = 9000; // SCN_CUSTOM_COMMAND
-            scn.message = iMessage;
-            scn.wParam = wParam; // SCN_CUSTOM_COMMAND_ID
-            scn.lParam = lParam;
-            NotifyParent(scn);
-        } while (false);
-        break;
+    case SCI_ALPHARECTANGLE:
+        (void)0; {
+            auto surfaceWindow = (Surface*)(wParam);
+            auto parameter = (AlphaRectangleParameters*)(lParam);
+            surfaceWindow->AlphaRectangle(parameter->rectangle, parameter->cornerSize/*cornerSize*/,
+                parameter->colorFill, parameter->alphaFill,
+                parameter->colorOutline, parameter->alphaOutline,
+                0 /*unused: flags */);
+        }
+        return 1;
 	default:
 		return DefWndProc(iMessage, wParam, lParam);
 	}

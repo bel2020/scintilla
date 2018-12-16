@@ -402,6 +402,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	void ClearAll();
 	void ClearDocumentStyle();
 	virtual void Cut();
+    virtual void LineCut(); // x-studio365 spec
 	void PasteRectangular(SelectionPosition pos, const char *ptr, Sci::Position len);
 	virtual void Copy() = 0;
 	virtual void CopyAllowLine();
@@ -430,7 +431,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	void NotifyHotSpotDoubleClicked(Sci::Position position, int modifiers);
 	void NotifyHotSpotReleaseClick(Sci::Position position, int modifiers);
 	bool NotifyUpdateUI();
-	void NotifyPainted();
+	void NotifyPainted(Surface*);
 	void NotifyIndicatorClick(bool click, Sci::Position position, int modifiers);
 	bool NotifyMarginClick(Point pt, int modifiers);
 	bool NotifyMarginRightClick(Point pt, int modifiers);

@@ -377,7 +377,7 @@ class ScintillaWin :
 
 	void GetIntelliMouseParameters();
 	void CopyToClipboard(const SelectionText &selectedText) override;
-	void ScrollMessage(WPARAM wParam);
+	void ScrollMessage(WPARAM wParam, LPARAM lParam);
 	void HorizontalScrollMessage(WPARAM wParam);
 	void FullPaint();
 	void FullPaintDC(HDC hdc);
@@ -1276,7 +1276,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			break;
 
 		case WM_VSCROLL:
-			ScrollMessage(wParam);
+			ScrollMessage(wParam, lParam);
 			break;
 
 		case WM_HSCROLL:
@@ -1946,7 +1946,13 @@ void ScintillaWin::UpdateSystemCaret() {
 }
 
 int ScintillaWin::SetScrollInfo(int nBar, LPCSCROLLINFO lpsi, BOOL bRedraw) {
-	return ::SetScrollInfo(MainHWND(), nBar, lpsi, bRedraw);
+	int ret = ::SetScrollInfo(MainHWND(), nBar, lpsi, bRedraw);
+
+    SCNotification scn = { 0 };
+    scn.nmhdr.code = SCN_VSCROLLCHANGE;
+    NotifyParent(scn);
+
+    return ret;
 }
 
 bool ScintillaWin::GetScrollInfo(int nBar, LPSCROLLINFO lpsi) {
@@ -2937,7 +2943,7 @@ void ScintillaWin::CopyToClipboard(const SelectionText &selectedText) {
 	::CloseClipboard();
 }
 
-void ScintillaWin::ScrollMessage(WPARAM wParam) {
+void ScintillaWin::ScrollMessage(WPARAM wParam, LPARAM lParam) {
 	//DWORD dwStart = timeGetTime();
 	//Platform::DebugPrintf("Scroll %x %d\n", wParam, lParam);
 
@@ -2946,6 +2952,10 @@ void ScintillaWin::ScrollMessage(WPARAM wParam) {
 	sci.fMask = SIF_ALL;
 
 	GetScrollInfo(SB_VERT, &sci);
+
+    if (lParam) { // x-studi365 spec, mirror scrollbar support.
+        sci.nTrackPos = reinterpret_cast<SCROLLINFO*>(lParam)->nTrackPos;
+    }
 
 	//Platform::DebugPrintf("ScrollInfo %d mask=%x min=%d max=%d page=%d pos=%d track=%d\n", b,sci.fMask,
 	//sci.nMin, sci.nMax, sci.nPage, sci.nPos, sci.nTrackPos);
