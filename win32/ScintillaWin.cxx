@@ -93,6 +93,7 @@
 #include "PlatWin.h"
 #include "HanjaDic.h"
 #include "ScintillaWin.h"
+#include "ScintillaExt.h"
 
 #ifndef SPI_GETWHEELSCROLLLINES
 #define SPI_GETWHEELSCROLLLINES   104

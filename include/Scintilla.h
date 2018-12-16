@@ -1226,18 +1226,6 @@ struct SCNotification {
 	/* SCN_AUTOCSELECTION, SCN_AUTOCCOMPLETED, SCN_USERLISTSELECTION, */
 };
 
-// x-studio365 spec
-struct SearchResultMarking {
-    long _start;
-    long _end;
-};
-
-// x-studio365 spec
-struct SearchResultMarkings {
-    long _length;
-    SearchResultMarking *_markings;
-};
-
 #ifdef INCLUDE_DEPRECATED_FEATURES
 
 #define SCI_SETKEYSUNICODE 2521

@@ -38,6 +38,7 @@
 #include "SciLexer.h"
 #include "CharacterSet.h"
 #include "LexerModule.h"
+#include "ScintillaExt.h"
 
 using namespace Scintilla;
 
