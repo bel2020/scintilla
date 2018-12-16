@@ -8,8 +8,8 @@
 // Additions Copyright (c) 2011 Archaeopteryx Software, Inc. d/b/a Wingware
 // ScintillaQt.cpp - Qt specific subclass of ScintillaBase
 
-#include "PlatQt.h"
 #include "ScintillaQt.h"
+#include "PlatQt.h"
 #ifdef SCI_LEXER
 #include "LexerModule.h"
 #include "ExternalLexer.h"
@@ -22,9 +22,9 @@
 #endif
 #include <QMimeData>
 #include <QMenu>
+#include <QTextCodec>
 #include <QScrollBar>
 #include <QTimer>
-#include <QTextCodec>
 
 using namespace Scintilla;
 
@@ -380,10 +380,12 @@ void ScintillaQt::NotifyChange()
 
 void ScintillaQt::NotifyFocus(bool focus)
 {
-	emit command(
-			Platform::LongFromTwoShorts
-					(GetCtrlID(), focus ? SCEN_SETFOCUS : SCEN_KILLFOCUS),
-			reinterpret_cast<sptr_t>(wMain.GetID()));
+	if (commandEvents) {
+		emit command(
+				Platform::LongFromTwoShorts
+						(GetCtrlID(), focus ? SCEN_SETFOCUS : SCEN_KILLFOCUS),
+				reinterpret_cast<sptr_t>(wMain.GetID()));
+	}
 
 	Editor::NotifyFocus(focus);
 }
