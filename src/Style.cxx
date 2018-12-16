@@ -6,6 +6,9 @@
 // The License.txt file describes the conditions under which this software may be distributed.
 
 #include <stdexcept>
+#include <string_view>
+#include <vector>
+#include <memory>
 
 #include "Platform.h"
 
@@ -26,7 +29,7 @@ FontAlias::~FontAlias() {
 	// ~Font will not release the actual font resource since it is now 0
 }
 
-void FontAlias::MakeAlias(Font &fontOrigin) {
+void FontAlias::MakeAlias(const Font &fontOrigin) {
 	SetID(fontOrigin.GetID());
 }
 
@@ -74,13 +77,13 @@ void FontMeasurements::ClearMeasurements() {
 
 Style::Style() : FontSpecification() {
 	Clear(ColourDesired(0, 0, 0), ColourDesired(0xff, 0xff, 0xff),
-	      Platform::DefaultFontSize() * SC_FONT_SIZE_MULTIPLIER, 0, SC_CHARSET_DEFAULT,
+	      Platform::DefaultFontSize() * SC_FONT_SIZE_MULTIPLIER, nullptr, SC_CHARSET_DEFAULT,
 	      SC_WEIGHT_NORMAL, false, false, false, caseMixed, true, true, false);
 }
 
 Style::Style(const Style &source) : FontSpecification(), FontMeasurements() {
 	Clear(ColourDesired(0, 0, 0), ColourDesired(0xff, 0xff, 0xff),
-	      0, 0, 0,
+	      0, nullptr, 0,
 	      SC_WEIGHT_NORMAL, false, false, false, caseMixed, true, true, false);
 	fore = source.fore;
 	back = source.back;
@@ -104,7 +107,7 @@ Style &Style::operator=(const Style &source) {
 	if (this == &source)
 		return * this;
 	Clear(ColourDesired(0, 0, 0), ColourDesired(0xff, 0xff, 0xff),
-	      0, 0, SC_CHARSET_DEFAULT,
+	      0, nullptr, SC_CHARSET_DEFAULT,
 	      SC_WEIGHT_NORMAL, false, false, false, caseMixed, true, true, false);
 	fore = source.fore;
 	back = source.back;

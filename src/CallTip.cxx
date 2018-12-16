@@ -13,6 +13,8 @@
 
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 #include <algorithm>
 #include <memory>
 
@@ -20,9 +22,8 @@
 
 #include "Scintilla.h"
 
-#include "IntegerRectangle.h"
-#include "StringCopy.h"
 #include "Position.h"
+#include "IntegerRectangle.h"
 #include "CallTip.h"
 
 using namespace Scintilla;
@@ -134,14 +135,14 @@ void CallTip::DrawChunk(Surface *surface, int &x, const char *s,
     						Point::FromInts(centreX + halfWidth, centreY + quarterWidth),
     						Point::FromInts(centreX, centreY - halfWidth + quarterWidth),
 						};
-						surface->Polygon(pts, ELEMENTS(pts), colourBG, colourBG);
+						surface->Polygon(pts, std::size(pts), colourBG, colourBG);
 					} else {            // Down arrow
 						Point pts[] = {
     						Point::FromInts(centreX - halfWidth, centreY - quarterWidth),
     						Point::FromInts(centreX + halfWidth, centreY - quarterWidth),
     						Point::FromInts(centreX, centreY + halfWidth - quarterWidth),
 						};
-						surface->Polygon(pts, ELEMENTS(pts), colourBG, colourBG);
+						surface->Polygon(pts, std::size(pts), colourBG, colourBG);
 					}
 				}
 				offsetMain = xEnd;
@@ -153,17 +154,18 @@ void CallTip::DrawChunk(Surface *surface, int &x, const char *s,
 			} else if (IsTabCharacter(s[startSeg])) {
 				xEnd = NextTabPos(x);
 			} else {
-				xEnd = x + static_cast<int>(lround(surface->WidthText(font, s + startSeg, endSeg - startSeg)));
+				std::string_view segText(s + startSeg, endSeg - startSeg);
+				xEnd = x + static_cast<int>(lround(surface->WidthText(font, segText)));
 				if (draw) {
 					rcClient.left = static_cast<XYPOSITION>(x);
 					rcClient.right = static_cast<XYPOSITION>(xEnd);
                     if (!highlight) {
                         surface->DrawTextTransparent(rcClient, font, static_cast<XYPOSITION>(ytext),
-                            s + startSeg, endSeg - startSeg, colourUnSel);
+                            segText, colourUnSel);
                     }
                     else { // x-studio365 spec: highlight bold support
                         surface->DrawTextTransparent(rcClient, fontSel, static_cast<XYPOSITION>(ytext),
-                            s + startSeg, endSeg - startSeg, colourSel);
+                            segText, colourSel);
                     }
 				}
 			}

@@ -12,6 +12,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -277,7 +278,7 @@ void ScintillaBase::AutoCompleteStart(Sci::Position lenEntered, const char *list
 		Redraw();
 		pt = PointMainCaret();
 	}
-	if (wMargin.GetID()) {
+	if (wMargin.Created()) {
 		const Point ptOrigin = GetVisibleOriginInMain();
 		pt.x += ptOrigin.x;
 		pt.y += ptOrigin.y;
@@ -296,7 +297,7 @@ void ScintillaBase::AutoCompleteStart(Sci::Position lenEntered, const char *list
 	}
 	rcac.right = rcac.left + widthLB;
 	rcac.bottom = static_cast<XYPOSITION>(std::min(static_cast<int>(rcac.top) + heightLB, static_cast<int>(rcPopupBounds.bottom)));
-	ac.lb->SetPositionRelative(rcac, wMain);
+	ac.lb->SetPositionRelative(rcac, &wMain);
 	ac.lb->SetFont(vs.styles[STYLE_DEFAULT].font);
 	const unsigned int aveCharWidth = static_cast<unsigned int>(vs.styles[STYLE_DEFAULT].aveCharWidth);
 	ac.lb->SetAverageCharWidth(aveCharWidth);
@@ -320,7 +321,7 @@ void ScintillaBase::AutoCompleteStart(Sci::Position lenEntered, const char *list
 		rcList.top = pt.y + vs.lineHeight;
 	}
 	rcList.bottom = rcList.top + heightAlloced;
-	ac.lb->SetPositionRelative(rcList, wMain);
+	ac.lb->SetPositionRelative(rcList, &wMain);
 	ac.Show(true);
 	if (lenEntered != 0) {
 		AutoCompleteMoveToCurrentWord();
@@ -445,12 +446,12 @@ int ScintillaBase::AutoCompleteGetCurrentText(char *buffer) const {
 		const int item = ac.GetSelection();
 		if (item != -1) {
 			const std::string selected = ac.GetValue(item);
-			if (buffer != NULL)
+			if (buffer)
 				memcpy(buffer, selected.c_str(), selected.length()+1);
 			return static_cast<int>(selected.length());
 		}
 	}
-	if (buffer != NULL)
+	if (buffer)
 		*buffer = '\0';
 	return 0;
 }
@@ -464,7 +465,7 @@ void ScintillaBase::CallTipShow(Point pt, const char *defn) {
 	if (ct.UseStyleCallTip()) {
 		ct.SetForeBack(vs.styles[STYLE_CALLTIP].fore, vs.styles[STYLE_CALLTIP].back);
 	}
-	if (wMargin.GetID()) {
+	if (wMargin.Created()) {
 		const Point ptOrigin = GetVisibleOriginInMain();
 		pt.x += ptOrigin.x;
 		pt.y += ptOrigin.y;
@@ -494,7 +495,7 @@ void ScintillaBase::CallTipShow(Point pt, const char *defn) {
 	}
 	// Now display the window.
 	CreateCallTipWindow(rc);
-	ct.wCallTip.SetPositionRelative(rc, wMain);
+	ct.wCallTip.SetPositionRelative(rc, &wMain);
 	ct.wCallTip.Show();
 }
 
@@ -598,7 +599,7 @@ public:
 }
 
 LexState::LexState(Document *pdoc_) : LexInterface(pdoc_) {
-	lexCurrent = 0;
+	lexCurrent = nullptr;
 	performingStyle = false;
 	interfaceVersion = lvRelease4;
 	lexLanguage = SCLEX_CONTAINER;
@@ -607,7 +608,7 @@ LexState::LexState(Document *pdoc_) : LexInterface(pdoc_) {
 LexState::~LexState() {
 	if (instance) {
 		instance->Release();
-		instance = 0;
+		instance = nullptr;
 	}
 }
 
@@ -622,7 +623,7 @@ void LexState::SetLexerModule(const LexerModule *lex) {
 	if (lex != lexCurrent) {
 		if (instance) {
 			instance->Release();
-			instance = 0;
+			instance = nullptr;
 		}
 		interfaceVersion = lvRelease4;
 		lexCurrent = lex;
@@ -637,7 +638,7 @@ void LexState::SetLexerModule(const LexerModule *lex) {
 void LexState::SetLexer(uptr_t wParam) {
 	lexLanguage = static_cast<int>(wParam);
 	if (lexLanguage == SCLEX_CONTAINER) {
-		SetLexerModule(0);
+		SetLexerModule(nullptr);
 	} else {
 		const LexerModule *lex = Catalogue::Find(lexLanguage);
 		if (!lex)
@@ -659,7 +660,7 @@ const char *LexState::DescribeWordListSets() {
 	if (instance) {
 		return instance->DescribeWordListSets();
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -680,7 +681,7 @@ void *LexState::PrivateCall(int operation, void *pointer) {
 	if (pdoc && instance) {
 		return instance->PrivateCall(operation, pointer);
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -688,7 +689,7 @@ const char *LexState::PropertyNames() {
 	if (instance) {
 		return instance->PropertyNames();
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -704,7 +705,7 @@ const char *LexState::DescribeProperty(const char *name) {
 	if (instance) {
 		return instance->DescribeProperty(name);
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -811,7 +812,7 @@ const char *LexState::NameOfStyle(int style) {
 	if (instance) {
 		return instance->NameOfStyle(style);
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -819,7 +820,7 @@ const char *LexState::TagsOfStyle(int style) {
 	if (instance) {
 		return instance->TagsOfStyle(style);
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -827,7 +828,7 @@ const char *LexState::DescriptionOfStyle(int style) {
 	if (instance) {
 		return instance->DescriptionOfStyle(style);
 	} else {
-		return 0;
+		return nullptr;
 	}
 }
 
@@ -1052,19 +1053,19 @@ sptr_t ScintillaBase::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lPara
 		break;
 
 	case SCI_CALLTIPSETBACK:
-		ct.colourBG = ColourDesired(static_cast<long>(wParam));
+		ct.colourBG = ColourDesired(static_cast<int>(wParam));
 		vs.styles[STYLE_CALLTIP].back = ct.colourBG;
 		InvalidateStyleRedraw();
 		break;
 
 	case SCI_CALLTIPSETFORE:
-		ct.colourUnSel = ColourDesired(static_cast<long>(wParam));
+		ct.colourUnSel = ColourDesired(static_cast<int>(wParam));
 		vs.styles[STYLE_CALLTIP].fore = ct.colourUnSel;
 		InvalidateStyleRedraw();
 		break;
 
 	case SCI_CALLTIPSETFOREHLT:
-		ct.colourSel = ColourDesired(static_cast<long>(wParam));
+		ct.colourSel = ColourDesired(static_cast<int>(wParam));
 		InvalidateStyleRedraw();
 		break;
 
