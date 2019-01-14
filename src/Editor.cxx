@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <cassert>
 #include <cstring>
-#include <cctype>
 #include <cstdio>
 #include <cmath>
 
@@ -5826,7 +5825,7 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 			if (wParam == 0)
 				return 0;
 			char *ptr = CharPtrFromSPtr(lParam);
-			unsigned int iChar = 0;
+			size_t iChar = 0;
 			for (; iChar < wParam - 1; iChar++)
 				ptr[iChar] = pdoc->CharAt(iChar);
 			ptr[iChar] = '\0';
@@ -5969,7 +5968,7 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 				return selectedText.LengthWithTerminator();
 			} else {
 				char *ptr = CharPtrFromSPtr(lParam);
-				unsigned int iChar = 0;
+				size_t iChar = 0;
 				if (selectedText.Length()) {
 					for (; iChar < selectedText.LengthWithTerminator(); iChar++)
 						ptr[iChar] = selectedText.Data()[iChar];
