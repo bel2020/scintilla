@@ -476,7 +476,7 @@ void Document::ClearLevels() {
 	Levels()->ClearLevels();
 }
 
-static bool IsSubordinate(int levelStart, int levelTry) {
+static bool IsSubordinate(int levelStart, int levelTry) noexcept {
 	if (levelTry & SC_FOLDLEVELWHITEFLAG)
 		return true;
 	else
@@ -1092,7 +1092,7 @@ int Document::DBCSDrawBytes(std::string_view text) const noexcept {
 	}
 }
 
-static inline bool IsSpaceOrTab(int ch) noexcept {
+static constexpr bool IsSpaceOrTab(int ch) noexcept {
 	return ch == ' ' || ch == '\t';
 }
 
@@ -1438,7 +1438,7 @@ void Document::DelCharBack(Sci::Position pos) {
 	}
 }
 
-static Sci::Position NextTab(Sci::Position pos, Sci::Position tabSize) noexcept {
+static constexpr Sci::Position NextTab(Sci::Position pos, Sci::Position tabSize) noexcept {
 	return ((pos / tabSize) + 1) * tabSize;
 }
 
@@ -2566,7 +2566,7 @@ Sci::Position Document::WordPartRight(Sci::Position pos) const {
 	return pos;
 }
 
-static bool IsLineEndChar(char c) noexcept {
+static constexpr bool IsLineEndChar(char c) noexcept {
 	return (c == '\n' || c == '\r');
 }
 
