@@ -118,7 +118,15 @@
 #define MK_ALT 32
 #endif
 
-#define SC_WIN_IDLE 5001
+// Two idle messages SC_WIN_IDLE and SC_WORK_IDLE.
+
+// SC_WIN_IDLE is low priority so should occur after the next WM_PAINT
+// It is for lengthy actions like wrapping and background styling 
+constexpr UINT SC_WIN_IDLE = 5001;
+// SC_WORK_IDLE is high priority and should occur before the next WM_PAINT
+// It is for shorter actions like restyling the text just inserted
+// and delivering SCN_UPDATEUI
+constexpr UINT SC_WORK_IDLE = 5002;
 
 #define SC_INDICATOR_INPUT INDIC_IME
 #define SC_INDICATOR_TARGET INDIC_IME+1
@@ -322,7 +330,7 @@ class ScintillaWin :
 	Sci::Position TargetAsUTF8(char *text) const;
 	void AddCharUTF16(wchar_t const *wcs, unsigned int wclen);
 	Sci::Position EncodedFromUTF8(const char *utf8, char *encoded) const;
-	sptr_t WndPaint(uptr_t wParam);
+	sptr_t WndPaint();
 
 	sptr_t HandleCompositionWindowed(uptr_t wParam, sptr_t lParam);
 	sptr_t HandleCompositionInline(uptr_t wParam, sptr_t lParam);
@@ -338,6 +346,8 @@ class ScintillaWin :
 	UINT CodePageOfDocument() const;
 	bool ValidCodePage(int codePage) const override;
 	sptr_t DefWndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) override;
+	void IdleWork() override;
+	void QueueIdleWork(WorkNeeded::workItems items, Sci::Position upTo) override;
 	bool SetIdle(bool on) override;
 	UINT_PTR timers[tickDwell+1] {};
 	bool FineTickerRunning(TickReason reason) override;
@@ -428,6 +438,7 @@ private:
 	HBITMAP sysCaretBitmap;
 	int sysCaretWidth;
 	int sysCaretHeight;
+	bool styleIdleInQueue;
 };
 
 HINSTANCE ScintillaWin::hInstance {};
@@ -473,6 +484,8 @@ ScintillaWin::ScintillaWin(HWND hwnd) {
 	sysCaretBitmap = 0;
 	sysCaretWidth = 0;
 	sysCaretHeight = 0;
+
+	styleIdleInQueue = false;
 
 #if defined(USE_D2D)
 	pRenderTarget = nullptr;
@@ -838,39 +851,31 @@ void ScintillaWin::AddCharUTF16(wchar_t const *wcs, unsigned int wclen) {
 	}
 }
 
-sptr_t ScintillaWin::WndPaint(uptr_t wParam) {
+sptr_t ScintillaWin::WndPaint() {
 	//ElapsedPeriod ep;
 
 	// Redirect assertions to debug output and save current state
 	const bool assertsPopup = Platform::ShowAssertionPopUps(false);
 	paintState = painting;
 	PAINTSTRUCT ps;
-	PAINTSTRUCT *pps;
 
-	const bool IsOcxCtrl = (wParam != 0); // if wParam != 0, it contains
-								   // a PAINTSTRUCT* from the OCX
 	// Removed since this interferes with reporting other assertions as it occurs repeatedly
 	//PLATFORM_ASSERT(hRgnUpdate == NULL);
 	hRgnUpdate = ::CreateRectRgn(0, 0, 0, 0);
-	if (IsOcxCtrl) {
-		pps = reinterpret_cast<PAINTSTRUCT*>(wParam);
-	} else {
-		::GetUpdateRgn(MainHWND(), hRgnUpdate, FALSE);
-		pps = &ps;
-		::BeginPaint(MainHWND(), pps);
-	}
-	rcPaint = PRectangle::FromInts(pps->rcPaint.left, pps->rcPaint.top, pps->rcPaint.right, pps->rcPaint.bottom);
+	::GetUpdateRgn(MainHWND(), hRgnUpdate, FALSE);
+	::BeginPaint(MainHWND(), &ps);
+	rcPaint = PRectangle::FromInts(ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right, ps.rcPaint.bottom);
 	const PRectangle rcClient = GetClientRectangle();
 	paintingAllText = BoundsContains(rcPaint, hRgnUpdate, rcClient);
 	if (technology == SC_TECHNOLOGY_DEFAULT) {
-		AutoSurface surfaceWindow(pps->hdc, this);
+		AutoSurface surfaceWindow(ps.hdc, this);
 		if (surfaceWindow) {
 			Paint(surfaceWindow, rcPaint);
 			surfaceWindow->Release();
 		}
 	} else {
 #if defined(USE_D2D)
-		EnsureRenderTarget(pps->hdc);
+		EnsureRenderTarget(ps.hdc);
 		AutoSurface surfaceWindow(pRenderTarget, this);
 		if (surfaceWindow) {
 			pRenderTarget->BeginDraw();
@@ -889,15 +894,11 @@ sptr_t ScintillaWin::WndPaint(uptr_t wParam) {
 		hRgnUpdate = 0;
 	}
 
-	if (!IsOcxCtrl)
-		::EndPaint(MainHWND(), pps);
+	::EndPaint(MainHWND(), &ps);
 	if (paintState == paintAbandoned) {
 		// Painting area was insufficient to cover new styling or brace highlight positions
-		if (IsOcxCtrl) {
-			FullPaintDC(pps->hdc);
-		} else {
-			FullPaint();
-		}
+		FullPaint();
+		::ValidateRect(MainHWND(), nullptr);
 	}
 	paintState = notPainting;
 
@@ -1280,7 +1281,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			Command(LOWORD(wParam));
 			break;
 		case WM_PAINT:
-			return WndPaint(wParam);
+			return WndPaint();
 
 		case WM_PRINTCLIENT: {
 				HDC hdc = reinterpret_cast<HDC>(wParam);
@@ -1406,6 +1407,10 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 					}
 				}
 			}
+			break;
+
+		case SC_WORK_IDLE:
+			IdleWork();
 			break;
 
 		case WM_GETMINMAXINFO:
@@ -1902,6 +1907,20 @@ bool ScintillaWin::SetIdle(bool on) {
 		idler.state = idler.idlerID != 0;
 	}
 	return idler.state;
+}
+
+void ScintillaWin::IdleWork() {
+	styleIdleInQueue = false;
+	Editor::IdleWork();
+}
+
+void ScintillaWin::QueueIdleWork(WorkNeeded::workItems items, Sci::Position upTo) {
+	Editor::QueueIdleWork(items, upTo);
+	if (!styleIdleInQueue) {
+		if (PostMessage(MainHWND(), SC_WORK_IDLE, 0, 0)) {
+			styleIdleInQueue = true;
+		}
+	}
 }
 
 void ScintillaWin::SetMouseCapture(bool on) {

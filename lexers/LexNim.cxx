@@ -55,6 +55,11 @@ int GetNumStyle(const int numType) {
     return SCE_NIM_NUMBER;
 }
 
+bool IsLetter(const int ch) {
+    // 97 to 122 || 65 to 90
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
 bool IsAWordChar(const int ch) {
     return ch < 0x80 && (isalnum(ch) || ch == '_' || ch == '.');
 }
@@ -73,6 +78,26 @@ int IsNumOctal(const StyleContext &sc) {
 
 bool IsNewline(const int ch) {
     return (ch == '\n' || ch == '\r');
+}
+
+bool IsFuncName(const char *str) {
+    const char *identifiers[] = {
+        "proc",
+        "func",
+        "macro",
+        "method",
+        "template",
+        "iterator",
+        "converter"
+    };
+
+    for (const char *id : identifiers) {
+        if (strcmp(str, id) == 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 constexpr bool IsTripleLiteral(const int style) noexcept {
@@ -143,10 +168,12 @@ int IndentAmount(const Sci_Position line, Accessor &styler) {
 struct OptionsNim {
     bool fold;
     bool foldCompact;
+    bool highlightRawStrIdent;
 
     OptionsNim() {
         fold = true;
         foldCompact = true;
+        highlightRawStrIdent = false;
     }
 };
 
@@ -157,6 +184,10 @@ static const char *const nimWordListDesc[] = {
 
 struct OptionSetNim : public OptionSet<OptionsNim> {
     OptionSetNim() {
+        DefineProperty("lexer.nim.raw.strings.highlight.ident", &OptionsNim::highlightRawStrIdent,
+            "Set to 1 to enable highlighting generalized raw string identifiers. "
+            "Generalized raw string identifiers are anything other than r (or R).");
+
         DefineProperty("fold", &OptionsNim::fold);
         DefineProperty("fold.compact", &OptionsNim::foldCompact);
 
@@ -338,8 +369,8 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
                         sc.Forward(2);
                     }
                 } else if (sc.ch == '.') {
-                    if (sc.chNext == '.') {
-                        // Pass
+                    if (IsADigit(sc.chNext)) {
+                        sc.Forward();
                     } else if (numType <= NumType::Exponent) {
                         sc.SetState(SCE_NIM_OPERATOR);
                         break;
@@ -360,7 +391,10 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
                         }
                     }
                 } else if (sc.ch == '_') {
-                    break;
+                    // Accept only one underscore between digits
+                    if (IsADigit(sc.chNext)) {
+                        sc.Forward();
+                    }
                 } else if (numType == NumType::Decimal) {
                     if (sc.chPrev != '\'' && (sc.ch == 'e' || sc.ch == 'E')) {
                         numType = NumType::Exponent;
@@ -404,13 +438,17 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
                 sc.SetState(SCE_NIM_DEFAULT);
                 break;
             case SCE_NIM_IDENTIFIER:
-                if (!IsAWordChar(sc.ch)) {
+                if (sc.ch == '.' || !IsAWordChar(sc.ch)) {
                     char s[100];
                     sc.GetCurrent(s, sizeof(s));
                     int style = SCE_NIM_IDENTIFIER;
 
                     if (keywords.InList(s) && !funcNameExists) {
-                        style = SCE_NIM_WORD;
+                        // Prevent styling keywords if they are sub-identifiers
+                        Sci_Position segStart = styler.GetStartSegment() - 1;
+                        if (segStart < 0 || styler.SafeGetCharAt(segStart, '\0') != '.') {
+                            style = SCE_NIM_WORD;
+                        }
                     } else if (funcNameExists) {
                         style = SCE_NIM_FUNCNAME;
                     }
@@ -419,17 +457,7 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
                     sc.SetState(SCE_NIM_DEFAULT);
 
                     if (style == SCE_NIM_WORD) {
-                        if (0 == strcmp(s, "proc") 
-                            || 0 == strcmp(s, "func") 
-                            || 0 == strcmp(s, "macro") 
-                            || 0 == strcmp(s, "method") 
-                            || 0 == strcmp(s, "template") 
-                            || 0 == strcmp(s, "iterator") 
-                            || 0 == strcmp(s, "converter")) {
-                            funcNameExists = true;
-                        } else {
-                            funcNameExists = false;
-                        }
+                        funcNameExists = IsFuncName(s);
                     } else {
                         funcNameExists = false;
                     }
@@ -437,6 +465,28 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
 
                 if (IsAlphaNumeric(sc.ch) && sc.chNext == '\"') {
                     isStylingRawStringIdent = true;
+
+                    if (options.highlightRawStrIdent) {
+                        if (styler.SafeGetCharAt(sc.currentPos + 2) == '\"' &&
+                            styler.SafeGetCharAt(sc.currentPos + 3) == '\"') {
+                            sc.ChangeState(SCE_NIM_TRIPLEDOUBLE);
+                        } else {
+                            sc.ChangeState(SCE_NIM_STRING);
+                        }
+                    }
+
+                    sc.ForwardSetState(SCE_NIM_DEFAULT);
+                }
+                break;
+            case SCE_NIM_FUNCNAME:
+                if (sc.ch == '`') {
+                    funcNameExists = false;
+                    sc.ForwardSetState(SCE_NIM_DEFAULT);
+                } else if (sc.atLineEnd) {
+                    // Prevent leaking the style to the next line if not closed
+                    funcNameExists = false;
+
+                    sc.ChangeState(SCE_NIM_STRINGEOL);
                     sc.ForwardSetState(SCE_NIM_DEFAULT);
                 }
                 break;
@@ -513,7 +563,10 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
                 }
                 break;
             case SCE_NIM_BACKTICKS:
-                if (sc.ch == '`' || sc.atLineEnd) {
+                if (sc.ch == '`' ) {
+                    sc.ForwardSetState(SCE_NIM_DEFAULT);
+                } else if (sc.atLineEnd) {
+                    sc.ChangeState(SCE_NIM_STRINGEOL);
                     sc.ForwardSetState(SCE_NIM_DEFAULT);
                 }
                 break;
@@ -542,7 +595,7 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
 
         if (sc.state == SCE_NIM_DEFAULT) {
             // Number
-            if (IsADigit(sc.ch) || (IsADigit(sc.chNext) && sc.ch == '.')) {
+            if (IsADigit(sc.ch)) {
                 sc.SetState(SCE_NIM_NUMBER);
 
                 numType = NumType::Decimal;
@@ -574,7 +627,10 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
                     sc.SetState(SCE_NIM_STRING);
                 }
 
-                if (sc.ch == 'r' || sc.ch == 'R') {
+                int rawStrStyle = options.highlightRawStrIdent ? IsLetter(sc.ch) :
+                                  (sc.ch == 'r' || sc.ch == 'R');
+
+                if (rawStrStyle) {
                     sc.Forward();
 
                     if (sc.state == SCE_NIM_TRIPLEDOUBLE) {
@@ -617,10 +673,10 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
             }
             // Operator definition
             else if (sc.ch == '`') {
-                sc.SetState(SCE_NIM_BACKTICKS);
-
                 if (funcNameExists) {
-                    funcNameExists = false;
+                    sc.SetState(SCE_NIM_FUNCNAME);
+                } else {
+                    sc.SetState(SCE_NIM_BACKTICKS);
                 }
             }
             // Keyword
@@ -650,15 +706,6 @@ void SCI_METHOD LexerNim::Lex(Sci_PositionU startPos, Sci_Position length,
             // Operators
             else if (strchr("()[]{}:=;-\\/&%$!+<>|^?,.*~@", sc.ch)) {
                 sc.SetState(SCE_NIM_OPERATOR);
-
-                // Ignore decimal coloring in input like: range[0..5]
-                if (sc.Match('.', '.')) {
-                    sc.Forward();
-
-                    if (sc.chNext == '.') {
-                        sc.Forward();
-                    }
-                }
             }
         }
 
