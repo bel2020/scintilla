@@ -1634,6 +1634,16 @@ class TestStyleAttributes(unittest.TestCase):
 		self.ed.StyleSetHotSpot(self.ed.STYLE_DEFAULT, 1)
 		self.assertEquals(self.ed.StyleGetHotSpot(self.ed.STYLE_DEFAULT), 1)
 
+	def testFoldDisplayTextStyle(self):
+		self.assertEquals(self.ed.FoldDisplayTextGetStyle(), 0)
+		self.ed.FoldDisplayTextSetStyle(self.ed.SC_FOLDDISPLAYTEXT_BOXED)
+		self.assertEquals(self.ed.FoldDisplayTextGetStyle(), self.ed.SC_FOLDDISPLAYTEXT_BOXED)
+
+	def testDefaultFoldDisplayText(self):
+		self.assertEquals(self.ed.GetDefaultFoldDisplayText(), b"")
+		self.ed.SetDefaultFoldDisplayText(0, b"...")
+		self.assertEquals(self.ed.GetDefaultFoldDisplayText(), b"...")
+
 class TestIndices(unittest.TestCase):
 	def setUp(self):
 		self.xite = Xite.xiteFrame
@@ -2281,6 +2291,11 @@ class TestWordChars(unittest.TestCase):
 		self._setChars("punctuation", expected)
 		data = self.ed.GetPunctuationChars(None)
 		self.assertCharSetsEqual(data, expected)
+
+	def testCharacterCategoryOptimization(self):
+		self.assertEquals(self.ed.CharacterCategoryOptimization, 0x100)
+		self.ed.CharacterCategoryOptimization = 0x1000
+		self.assertEquals(self.ed.CharacterCategoryOptimization, 0x1000)
 
 class TestExplicitTabStops(unittest.TestCase):
 
