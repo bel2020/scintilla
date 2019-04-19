@@ -374,6 +374,7 @@ class ScintillaWin :
 	void CopyAllowLine() override;
 	bool CanPaste() override;
 	void Paste() override;
+	void QuickPaste() override; // x-studio365 spec.
 	void CreateCallTipWindow(PRectangle rc) override;
 	void AddToPopUp(const char *label, int cmd = 0, bool enabled = true) override;
 	void ClaimSelection() override;
@@ -385,7 +386,7 @@ class ScintillaWin :
 
 	void GetIntelliMouseParameters() noexcept;
 	void CopyToClipboard(const SelectionText &selectedText) override;
-	void ScrollMessage(WPARAM wParam);
+	void ScrollMessage(WPARAM wParam, LPARAM lParam); // x-studio365 spec
 	void HorizontalScrollMessage(WPARAM wParam);
 	void FullPaint();
 	void FullPaintDC(HDC hdc);
@@ -1272,7 +1273,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			break;
 
 		case WM_VSCROLL:
-			ScrollMessage(wParam);
+			ScrollMessage(wParam, lParam); // x-studio365 spec
 			break;
 
 		case WM_HSCROLL:
@@ -1469,21 +1470,42 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			}
 
 		case WM_CHAR:
-			if (((wParam >= 128) || !iscntrl(static_cast<int>(wParam))) || !lastKeyDownConsumed) {
-				wchar_t wcs[3] = {static_cast<wchar_t>(wParam), 0};
-				unsigned int wclen = 1;
-				if (IS_HIGH_SURROGATE(wcs[0])) {
-					// If this is a high surrogate character, we need a second one
-					lastHighSurrogateChar = wcs[0];
-					return 0;
-				} else if (IS_LOW_SURROGATE(wcs[0])) {
-					wcs[1] = wcs[0];
-					wcs[0] = lastHighSurrogateChar;
-					lastHighSurrogateChar = 0;
-					wclen = 2;
-				}
-				AddWString(std::wstring_view(wcs, wclen));
-			}
+            if (!KeyboardIsKeyDown(VK_CONTROL)) { // x-studio365 spec, disable input when key CTRL is pressed. 
+                if (((wParam >= 128) || !iscntrl(static_cast<int>(wParam))) || !lastKeyDownConsumed) {
+                    wchar_t wcs[3] = {static_cast<wchar_t>(wParam), 0};
+                    unsigned int wclen = 1;
+                    if (IS_HIGH_SURROGATE(wcs[0])) {
+                        // If this is a high surrogate character, we need a second one
+                        lastHighSurrogateChar = wcs[0];
+                        return 0;
+                    } else if (IS_LOW_SURROGATE(wcs[0])) {
+                        wcs[1] = wcs[0];
+                        wcs[0] = lastHighSurrogateChar;
+                        lastHighSurrogateChar = 0;
+                        wclen = 2;
+                    }
+                    if (wcs[0] == '\'' || wcs[0] == '\"')
+                    { // x-studio365 spec, quick make string literial support.
+                        auto nCharStart = ScintillaBase::WndProc(SCI_GETSELECTIONSTART, 0, 0);
+                        auto nCharEnd = ScintillaBase::WndProc(SCI_GETSELECTIONEND, 0, 0);
+                        if (nCharEnd > nCharStart) {
+                            std::string utf8(nCharEnd - nCharStart + 2, wcs[0]);
+                            Sci_TextRange tr;
+                            tr.chrg.cpMin = nCharStart;
+                            tr.chrg.cpMax = nCharEnd;
+                            tr.lpstrText = &utf8.front() + 1;
+                            static_cast<int>(ScintillaBase::WndProc(SCI_GETTEXTRANGE, 0, reinterpret_cast<LPARAM>(&tr)));
+                            utf8.back() = wcs[0];
+                            AddWString(std::wstring_view(utf8.c_str(), utf8.length()));
+                        }
+                        else {
+                            AddWString(std::wstring_view(wcs, wclen));
+                        }
+                    }
+                    else 
+                        AddWString(std::wstring_view(wcs, wclen));
+                }
+            }
 			return 0;
 
 		case WM_UNICHAR:
@@ -1499,8 +1521,19 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			}
 
 		case WM_SYSKEYDOWN:
-		case WM_KEYDOWN: {
+		case WM_KEYDOWN: 
 			//Platform::DebugPrintf("S keydown %d %x %x %x %x\n",iMessage, wParam, lParam, ::IsKeyDown(VK_SHIFT), ::IsKeyDown(VK_CONTROL));
+            if (wParam == VK_CONTROL) {
+                POINT pt;
+                if (0 != ::GetCursorPos(&pt)) {
+                    ::ScreenToClient(MainHWND(), &pt);
+                    if ((PointIsHotspot(PointFromPOINT(pt)) || hoverIndicatorPos != Sci::invalidPosition)) { // x-studio365 spec, avoid flick & looks like VS
+                        DisplayCursor(Window::cursorHand);
+                    }
+                }
+            }
+            if (!ct.inCallTipMode || (wParam != VK_UP && wParam != VK_DOWN)) 
+            { 
 				lastKeyDownConsumed = false;
 				const int ret = KeyDownWithModifiers(KeyTranslate(static_cast<int>(wParam)),
 					ModifierFlags(KeyboardIsKeyDown(VK_SHIFT),
@@ -1512,7 +1545,11 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 				}
 				break;
 			}
-
+            else { // x-studio365  spec, vs like calltip process
+                if (wParam == VK_DOWN) ct.clickPlace = 2;
+                else ct.clickPlace = 1;
+                CallTipClick(); // Send CallTipClick message to parent
+            }
 		case WM_IME_KEYDOWN: {
 				if (wParam == VK_HANJA) {
 					ToggleHanja();
@@ -1529,6 +1566,12 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 
 		case WM_KEYUP:
 			//Platform::DebugPrintf("S keyup %d %x %x\n",iMessage, wParam, lParam);
+            if (wParam == VK_CONTROL) { // x-studio365  spec
+                if (!KeyboardIsKeyDown(VK_CONTROL))
+                {
+                    DisplayCursor(Window::cursorText);
+                }
+            }
 			return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
 
 		case WM_SETTINGCHANGE:
@@ -1716,6 +1759,13 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 		case SCI_GRABFOCUS:
 			::SetFocus(MainHWND());
 			break;
+        	case SCI_GETMARGINFROMPOINT: // x-studio365  spec
+            		(void)0; {
+                	POINT rpt = { static_cast<int>(wParam), static_cast<int>(lParam) };
+                	::ScreenToClient(MainHWND(), &rpt);
+                	const Point ptClient = PointFromPOINT(rpt);
+                	return PointInSelMargin(ptClient);
+           		}
 
 #ifdef INCLUDE_DEPRECATED_FEATURES
 		case SCI_SETKEYSUNICODE:
@@ -2329,6 +2379,44 @@ void ScintillaWin::Paste() {
 	Redraw();
 }
 
+void ScintillaWin::QuickPaste()
+{ // x-studio365 spec
+    SelectionText selectedText;
+    CopySelectionRange(&selectedText, true);
+
+    if (!::OpenClipboardRetry(MainHWND())) {
+        return;
+    }
+
+    UndoGroup ug(pdoc);
+    const bool isLine = SelectionEmpty();
+    // ClearSelection(multiPasteMode == SC_MULTIPASTE_EACH);
+    bool isRectangular = (::IsClipboardFormatAvailable(cfColumnSelect) != 0);
+
+    if (!isRectangular) {
+        // Evaluate "Borland IDE Block Type" explicitly
+        GlobalMemory memBorlandSelection(::GetClipboardData(cfBorlandIDEBlockType));
+        if (memBorlandSelection) {
+            isRectangular = (memBorlandSelection.Size() == 1) && (static_cast<BYTE *>(memBorlandSelection.ptr)[0] == 0x02);
+            memBorlandSelection.Unlock();
+        }
+    }
+    const PasteShape pasteShape = isRectangular ? pasteRectangular : (isLine ? pasteLine : pasteStream);
+
+    // Cancel selection
+    auto nPos = sel.IsRectangular() ? sel.Rectangular().caret.Position() : sel.MainCaret();
+    InvalidateSelection(SelectionRange(nPos, nPos));
+    sel.Clear();
+    sel.selType = Selection::selStream;
+    SetSelection(nPos, nPos);
+
+    // Insert Paste immediately
+    InsertPasteShape(selectedText.Data(), static_cast<int>(selectedText.Length()), pasteShape);
+
+    ::CloseClipboard();
+    Redraw();
+}
+
 void ScintillaWin::CreateCallTipWindow(PRectangle) {
 	if (!ct.wCallTip.Created()) {
 		HWND wnd = ::CreateWindow(callClassName, TEXT("ACallTip"),
@@ -2861,7 +2949,7 @@ void ScintillaWin::CopyToClipboard(const SelectionText &selectedText) {
 	::CloseClipboard();
 }
 
-void ScintillaWin::ScrollMessage(WPARAM wParam) {
+void ScintillaWin::ScrollMessage(WPARAM wParam, LPARAM lParam) {
 	//DWORD dwStart = timeGetTime();
 	//Platform::DebugPrintf("Scroll %x %d\n", wParam, lParam);
 
@@ -2870,6 +2958,10 @@ void ScintillaWin::ScrollMessage(WPARAM wParam) {
 	sci.fMask = SIF_ALL;
 
 	GetScrollInfo(SB_VERT, &sci);
+
+    if (lParam) { // x-studi365 spec, mirror scrollbar support.
+        sci.nTrackPos = reinterpret_cast<SCROLLINFO*>(lParam)->nTrackPos;
+    }
 
 	//Platform::DebugPrintf("ScrollInfo %d mask=%x min=%d max=%d page=%d pos=%d track=%d\n", b,sci.fMask,
 	//sci.nMin, sci.nMax, sci.nPage, sci.nPos, sci.nTrackPos);
