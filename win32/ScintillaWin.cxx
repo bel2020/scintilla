@@ -93,6 +93,7 @@
 #include "PlatWin.h"
 #include "HanjaDic.h"
 #include "ScintillaWin.h"
+#include "ScintillaExt.h"
 
 #ifndef SPI_GETWHEELSCROLLLINES
 #define SPI_GETWHEELSCROLLLINES   104
@@ -1496,7 +1497,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
                             tr.lpstrText = &utf8.front() + 1;
                             static_cast<int>(ScintillaBase::WndProc(SCI_GETTEXTRANGE, 0, reinterpret_cast<LPARAM>(&tr)));
                             utf8.back() = wcs[0];
-                            AddWString(std::wstring_view(utf8.c_str(), utf8.length()));
+                            AddCharUTF(utf8.c_str(), utf8.length());
                         }
                         else {
                             AddWString(std::wstring_view(wcs, wclen));
@@ -1962,7 +1963,13 @@ void ScintillaWin::UpdateSystemCaret() {
 }
 
 int ScintillaWin::SetScrollInfo(int nBar, LPCSCROLLINFO lpsi, BOOL bRedraw) noexcept {
-	return ::SetScrollInfo(MainHWND(), nBar, lpsi, bRedraw);
+    int ret = ::SetScrollInfo(MainHWND(), nBar, lpsi, bRedraw);
+
+    // x-studio365 spec
+    SCNotification scn = { 0 };
+    scn.nmhdr.code = SCN_VSCROLLCHANGE;
+    NotifyParent(scn);
+    return ret;
 }
 
 bool ScintillaWin::GetScrollInfo(int nBar, LPSCROLLINFO lpsi) noexcept {
