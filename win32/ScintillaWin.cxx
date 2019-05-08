@@ -1458,7 +1458,8 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 							DisplayCursor(GetMarginCursor(PointFromPOINT(pt)));
 						} else if (PointInSelection(PointFromPOINT(pt)) && !SelectionEmpty()) {
 							DisplayCursor(Window::cursorArrow);
-						} else if (PointIsHotspot(PointFromPOINT(pt))) {
+						} else if (KeyboardIsKeyDown(VK_CONTROL) && (PointIsHotspot(PointFromPOINT(pt)) || hoverIndicatorPos != Sci::invalidPosition)) {
+							// x-studio365 spec, avoid flick & looks like VS
 							DisplayCursor(Window::cursorHand);
 						} else {
 							DisplayCursor(Window::cursorText);
