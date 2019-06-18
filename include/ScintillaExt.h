@@ -2,6 +2,8 @@
 #pragma once
 #include "Platform.h"
 
+#define SCLEX_SEARCHRESULT 150
+
 #define SCN_VSCROLLCHANGE 2033
 #define SCI_ALPHARECTANGLE 2810
 

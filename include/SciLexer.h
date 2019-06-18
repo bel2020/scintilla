@@ -140,8 +140,6 @@
 #define SCLEX_SAS 125
 #define SCLEX_NIM 126
 #define SCLEX_CIL 127
-// custom lexers, halx99: spec
-#define SCLEX_SEARCHRESULT 150
 #define SCLEX_AUTOMATIC 1000
 #define SCE_P_DEFAULT 0
 #define SCE_P_COMMENTLINE 1
