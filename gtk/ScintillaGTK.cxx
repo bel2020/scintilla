@@ -91,10 +91,10 @@
 #define IS_WIDGET_REALIZED(w) (gtk_widget_get_realized(GTK_WIDGET(w)))
 #define IS_WIDGET_MAPPED(w) (gtk_widget_get_mapped(GTK_WIDGET(w)))
 
-#define SC_INDICATOR_INPUT INDIC_IME
-#define SC_INDICATOR_TARGET INDIC_IME+1
-#define SC_INDICATOR_CONVERTED INDIC_IME+2
-#define SC_INDICATOR_UNKNOWN INDIC_IME_MAX
+#define SC_INDICATOR_INPUT INDICATOR_IME
+#define SC_INDICATOR_TARGET INDICATOR_IME+1
+#define SC_INDICATOR_CONVERTED INDICATOR_IME+2
+#define SC_INDICATOR_UNKNOWN INDICATOR_IME_MAX
 
 static GdkWindow *WindowFromWidget(GtkWidget *w) noexcept {
 	return gtk_widget_get_window(w);
@@ -2259,9 +2259,9 @@ void ScintillaGTK::MoveImeCarets(int pos) {
 void ScintillaGTK::DrawImeIndicator(int indicator, int len) {
 	// Emulate the visual style of IME characters with indicators.
 	// Draw an indicator on the character before caret by the character bytes of len
-	// so it should be called after addCharUTF().
+	// so it should be called after InsertCharacter().
 	// It does not affect caret positions.
-	if (indicator < 8 || indicator > INDIC_MAX) {
+	if (indicator < 8 || indicator > INDICATOR_MAX) {
 		return;
 	}
 	pdoc->DecorationSetCurrentIndicator(indicator);
@@ -2351,7 +2351,7 @@ void ScintillaGTK::CommitThis(char *commitStr) {
 			if (!IsUnicodeMode())
 				docChar = ConvertText(u8Char, u8CharLen, charSetSource, "UTF-8", true);
 
-			AddCharUTF(docChar.c_str(), docChar.size());
+			InsertCharacter(docChar, CharacterSource::directInput);
 		}
 		g_free(uniStr);
 		ShowCaretAtCurrentPosition();
@@ -2403,8 +2403,6 @@ void ScintillaGTK::PreeditChangedInlineThis() {
 
 		std::vector<int> indicator = MapImeIndicators(preeditStr.attrs, preeditStr.str);
 
-		const bool tmpRecordingMacro = recordingMacro;
-		recordingMacro = false;
 		for (glong i = 0; i < preeditStr.uniStrLen; i++) {
 			gchar u8Char[UTF8MaxBytes+2] = {0};
 			const gint u8CharLen = g_unichar_to_utf8(preeditStr.uniStr[i], u8Char);
@@ -2412,11 +2410,10 @@ void ScintillaGTK::PreeditChangedInlineThis() {
 			if (!IsUnicodeMode())
 				docChar = ConvertText(u8Char, u8CharLen, charSetSource, "UTF-8", true);
 
-			AddCharUTF(docChar.c_str(), docChar.size());
+			InsertCharacter(docChar, CharacterSource::tentativeInput);
 
 			DrawImeIndicator(indicator[i], docChar.size());
 		}
-		recordingMacro = tmpRecordingMacro;
 
 		// Move caret to ime cursor position.
 		const int imeEndToImeCaretU32 = preeditStr.cursor_pos - preeditStr.uniStrLen;
