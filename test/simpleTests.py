@@ -19,6 +19,13 @@ class TestSimple(unittest.TestCase):
 		self.ed.ClearAll()
 		self.ed.EmptyUndoBuffer()
 
+	def testStatus(self):
+		self.assertEquals(self.ed.GetStatus(), 0)
+		self.ed.SetStatus(1)
+		self.assertEquals(self.ed.GetStatus(), 1)
+		self.ed.SetStatus(0)
+		self.assertEquals(self.ed.GetStatus(), 0)
+
 	def testLength(self):
 		self.assertEquals(self.ed.Length, 0)
 
@@ -540,9 +547,14 @@ class TestSimple(unittest.TestCase):
 	def testGetSet(self):
 		self.ed.SetContents(b"abc")
 		self.assertEquals(self.ed.TextLength, 3)
-		result = ctypes.create_string_buffer(b"\0" * 5)
+		# String buffer containing exactly 5 digits
+		result = ctypes.create_string_buffer(b"12345", 5)
+		self.assertEquals(result.raw, b"12345")
 		length = self.ed.GetText(4, result)
+		self.assertEquals(length, 3)
 		self.assertEquals(result.value, b"abc")
+		# GetText has written the 3 bytes of text and a terminating NUL but left the final digit 5
+		self.assertEquals(result.raw, b"abc\x005")
 
 	def testAppend(self):
 		self.ed.SetContents(b"abc")
