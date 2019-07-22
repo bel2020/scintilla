@@ -1907,6 +1907,9 @@ void Editor::InsertCharacter(std::string_view sv, CharacterSource charSource) {
 	if (sv.empty()) {
 		return;
 	}
+
+	NotifyChar(static_cast<unsigned char>(sv[0]), charSource, SCN_CHARADDING);
+
 	FilterSelections();
 	{
 		UndoGroup ug(pdoc, (sel.Count() > 1) || !sel.Empty() || inOverstrike);
@@ -2358,9 +2361,9 @@ void Editor::NotifyErrorOccurred(Document *, void *, int status) {
 	errorStatus = status;
 }
 
-void Editor::NotifyChar(int ch, CharacterSource charSource) {
+void Editor::NotifyChar(int ch, CharacterSource charSource, int nmcode) {
 	SCNotification scn = {};
-	scn.nmhdr.code = SCN_CHARADDED;
+	scn.nmhdr.code = nmcode;
 	scn.ch = ch;
 	scn.characterSource = static_cast<int>(charSource);
 	NotifyParent(scn);

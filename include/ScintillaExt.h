@@ -4,8 +4,10 @@
 
 #define SCLEX_SEARCHRESULT 150
 
-#define SCN_VSCROLLCHANGE 2033
-#define SCI_ALPHARECTANGLE 2810
+#define SCN_CHARADDING 1999
+#define SCN_VSCROLLCHANGE 2099
+
+#define SCI_ALPHARECTANGLE 4099
 
 struct SearchResultMarking {
     long _start;
