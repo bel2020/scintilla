@@ -4,7 +4,7 @@
  **/
 // Copyright 1998-2011 by Neil Hodgson <neilh@scintilla.org>
 // The License.txt file describes the conditions under which this software may be distributed.
-#define USING_BOOST_REGEX 1
+#define HAVE_BOOST_REGEX 1
 #define REGEX_MULTILINE
 
 #include <cstddef>
@@ -48,7 +48,14 @@
 #include "RESearch.h"
 #include "UniConversion.h"
 #include "ElapsedPeriod.h"
+
+#if HAVE_BOOST_REGEX
 #include "BoostRegexSearch.h"
+namespace Scintilla
+{
+    extern RegexSearchBase *CreateBoostRegexSearch(CharClassify* /* charClassTable */);
+}
+#endif
 
 using namespace Scintilla;
 
@@ -1981,10 +1988,6 @@ Document::CharacterExtracted Document::ExtractCharacter(Sci::Position position) 
  * searches (just pass minPos > maxPos to do a backward search)
  * Has not been tested with backwards DBCS searches yet.
  */
-namespace Scintilla
-{
-    extern RegexSearchBase *CreateBoostRegexSearch(CharClassify* /* charClassTable */);
-}
 Sci::Position Document::FindText(Sci::Position minPos, Sci::Position maxPos, const char *search,
                         int flags, Sci::Position *length) {
 
@@ -1997,7 +2000,7 @@ Sci::Position Document::FindText(Sci::Position minPos, Sci::Position maxPos, con
 	if (regExp) {
         // regex =  std::unique_ptr<RegexSearchBase>((flags & SCFIND_BOOSTREGEX) ? CreateBoostRegexSearch(&charClass) : CreateRegexSearch(&charClass));
         if (!regex) {
-#if USING_BOOST_REGEX
+#if HAVE_BOOST_REGEX
             regex = std::unique_ptr<RegexSearchBase>(CreateBoostRegexSearch(&charClass)); 
 #else
             regex = std::unique_ptr<RegexSearchBase>(CreateRegexSearch(&charClass));
