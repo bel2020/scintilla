@@ -137,9 +137,6 @@ void ScintillaBase::Command(int cmdId) {
 	case idcmdSelectAll:
 		WndProc(SCI_SELECTALL, 0, 0);
 		break;
-    case idcmdSelectAll+1: // x-studio365 spec: vscode like replace all matched
-        WndProc(9000, 9001, 0); // Send a SCN_CUSTOM_COMMAND=9000 SCN_CUSTOM_COMMAND_ID=9001
-        break;
 	}
 }
 
@@ -516,9 +513,6 @@ void ScintillaBase::ContextMenu(Point pt) {
 	if (displayPopupMenu) {
 		const bool writable = !WndProc(SCI_GETREADONLY, 0, 0);
 		popup.CreatePopUp();
-		// x-studio365 spec
-        AddToPopUp("Clear All", idcmdSelectAll+1, writable && !sel.Empty());
-        AddToPopUp("");
 		AddToPopUp("Undo", idcmdUndo, writable && pdoc->CanUndo());
 		AddToPopUp("Redo", idcmdRedo, writable && pdoc->CanRedo());
 		AddToPopUp("");

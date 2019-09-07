@@ -22,11 +22,7 @@
 using namespace Scintilla;
 
 KeyMap::KeyMap() {
-	for (int i = 0; MapDefault[i].key; i++) {
-		AssignCmdKey(MapDefault[i].key,
-			MapDefault[i].modifiers,
-			MapDefault[i].msg);
-	}
+    Reset();
 }
 
 KeyMap::~KeyMap() {
@@ -35,6 +31,15 @@ KeyMap::~KeyMap() {
 
 void KeyMap::Clear() noexcept {
 	kmap.clear();
+}
+
+void KeyMap::Reset() noexcept
+{
+    for (int i = 0; MapDefault[i].key; i++) {
+        AssignCmdKey(MapDefault[i].key,
+            MapDefault[i].modifiers,
+            MapDefault[i].msg);
+    }
 }
 
 void KeyMap::AssignCmdKey(int key, int modifiers, unsigned int msg) {
@@ -157,7 +162,7 @@ const KeyToCommand KeyMap::MapDefault[] = {
     {'L', 			SCI_CSHIFT,	SCI_LINEDELETE},
     {'T', 			SCI_CSHIFT,	SCI_LINECOPY},
     {'T', 			SCI_CTRL,	SCI_LINETRANSPOSE},
-    {'E', 			SCI_CTRL,	SCI_SELECTIONDUPLICATE}, // x-studio365 spec, Ctrl+D --> Ctrl+E
+    {'D', 			SCI_CTRL,	SCI_SELECTIONDUPLICATE},
     {'U', 			SCI_CTRL,	SCI_LOWERCASE},
     {'U', 			SCI_CSHIFT,	SCI_UPPERCASE},
     {0,0,0},

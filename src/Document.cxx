@@ -53,7 +53,7 @@
 #include "BoostRegexSearch.h"
 namespace Scintilla
 {
-    extern RegexSearchBase *CreateBoostRegexSearch(CharClassify* /* charClassTable */);
+extern RegexSearchBase *CreateBoostRegexSearch(CharClassify* /* charClassTable */);
 }
 #endif
 

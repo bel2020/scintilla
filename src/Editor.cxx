@@ -2790,7 +2790,6 @@ void Editor::NotifyMacroRecord(unsigned int iMessage, uptr_t wParam, sptr_t lPar
 	case SCI_APPENDTEXT:
 	case SCI_CLEARALL:
 	case SCI_SELECTALL:
-        case SCI_SELECTALL+1: // x-studio365 spec
 	case SCI_GOTOLINE:
 	case SCI_GOTOPOS:
 	case SCI_SEARCHANCHOR:
@@ -7416,6 +7415,10 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 		kmap.Clear();
 		break;
 
+	case SCI_RESETALLCMDKEYS:
+		kmap.Reset();
+		break;
+
 	case SCI_INDICSETSTYLE:
 		if (wParam <= INDICATOR_MAX) {
 			vs.indicators[wParam].sacNormal.style = static_cast<int>(lParam);
@@ -8342,8 +8345,16 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
                 0 /*unused: flags */);
         }
         return 1;
-	default:
-		return DefWndProc(iMessage, wParam, lParam);
+	default: 
+        (void)0; { // x-studio365 spec, notify unknown message to parent, make sure user end have chance to process the message.
+            SCNotification scn = {};
+            scn.nmhdr.code = SCN_UNKNOWN_MESSAGE;
+            scn.wParam = iMessage;
+            NotifyParent(scn);
+            if(!scn.lParam)
+                return DefWndProc(iMessage, wParam, lParam);
+        }
+        return 1;
 	}
 	//Platform::DebugPrintf("end wnd proc\n");
 	return 0;
