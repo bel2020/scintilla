@@ -178,11 +178,11 @@ inline bool isoperator(int ch) {
 // Simple case functions for ASCII supersets.
 
 template <typename T>
-inline T MakeUpperCase(T ch) {
-	if (ch < 'a' || ch > 'z')
+inline int MakeUpperCase(T ch) { // x-studio spec, fix autoc behavior error when word has '_'
+	if ((ch < 'a' || ch > 'z') && ch != '_')
 		return ch;
 	else
-		return ch - 'a' + 'A';
+		return static_cast<char>(ch - 'a' + 'A');
 }
 
 template <typename T>

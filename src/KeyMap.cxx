@@ -22,11 +22,7 @@
 using namespace Scintilla;
 
 KeyMap::KeyMap() {
-	for (int i = 0; MapDefault[i].key; i++) {
-		AssignCmdKey(MapDefault[i].key,
-			MapDefault[i].modifiers,
-			MapDefault[i].msg);
-	}
+    Reset();
 }
 
 KeyMap::~KeyMap() {
@@ -35,6 +31,16 @@ KeyMap::~KeyMap() {
 
 void KeyMap::Clear() noexcept {
 	kmap.clear();
+}
+
+void KeyMap::Reset() noexcept
+{
+    Clear();
+    for (int i = 0; MapDefault[i].key; i++) {
+        AssignCmdKey(MapDefault[i].key,
+            MapDefault[i].modifiers,
+            MapDefault[i].msg);
+    }
 }
 
 void KeyMap::AssignCmdKey(int key, int modifiers, unsigned int msg) {

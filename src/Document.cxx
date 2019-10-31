@@ -4,6 +4,8 @@
  **/
 // Copyright 1998-2011 by Neil Hodgson <neilh@scintilla.org>
 // The License.txt file describes the conditions under which this software may be distributed.
+#define HAVE_BOOST_REGEX 1
+#define REGEX_MULTILINE
 
 #include <cstddef>
 #include <cstdlib>
@@ -46,6 +48,14 @@
 #include "RESearch.h"
 #include "UniConversion.h"
 #include "ElapsedPeriod.h"
+
+#if HAVE_BOOST_REGEX
+#include "BoostRegexSearch.h"
+namespace Scintilla
+{
+extern RegexSearchBase *CreateBoostRegexSearch(CharClassify* /* charClassTable */);
+}
+#endif
 
 using namespace Scintilla;
 
@@ -1980,6 +1990,7 @@ Document::CharacterExtracted Document::ExtractCharacter(Sci::Position position) 
  */
 Sci::Position Document::FindText(Sci::Position minPos, Sci::Position maxPos, const char *search,
                         int flags, Sci::Position *length) {
+
 	if (*length <= 0)
 		return minPos;
 	const bool caseSensitive = (flags & SCFIND_MATCHCASE) != 0;
@@ -1987,8 +1998,15 @@ Sci::Position Document::FindText(Sci::Position minPos, Sci::Position maxPos, con
 	const bool wordStart = (flags & SCFIND_WORDSTART) != 0;
 	const bool regExp = (flags & SCFIND_REGEXP) != 0;
 	if (regExp) {
-		if (!regex)
-			regex = std::unique_ptr<RegexSearchBase>(CreateRegexSearch(&charClass));
+        // regex =  std::unique_ptr<RegexSearchBase>((flags & SCFIND_BOOSTREGEX) ? CreateBoostRegexSearch(&charClass) : CreateRegexSearch(&charClass));
+        if (!regex) {
+#if HAVE_BOOST_REGEX
+            regex = std::unique_ptr<RegexSearchBase>(CreateBoostRegexSearch(&charClass)); 
+#else
+            regex = std::unique_ptr<RegexSearchBase>(CreateRegexSearch(&charClass));
+#endif
+        }
+        
 		return regex->FindText(this, minPos, maxPos, search, caseSensitive, word, wordStart, flags, length);
 	} else {
 
@@ -3007,6 +3025,8 @@ bool MatchOnLines(const Document *doc, const Regex &regexp, const RESearchRange 
 	// mode and libc++ and libstdc++ always in single-line mode.
 	// If multiline regex worked well then the line by line iteration could be removed
 	// for the forwards case and replaced with the following 4 lines:
+    // @HALX99: Well, MSVC, if no REGEX_MULTILINE, the regex search does not support match CRLF.
+    // see: https://github.com/simdsoft/x-studio/issues/225
 #ifdef REGEX_MULTILINE
 	Iterator itStart(doc, resr.startPos);
 	Iterator itEnd(doc, resr.endPos);

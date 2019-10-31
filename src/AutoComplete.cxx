@@ -39,8 +39,8 @@ AutoComplete::AutoComplete() :
 	autoHide(true),
 	dropRestOfWord(false),
 	ignoreCaseBehaviour(SC_CASEINSENSITIVEBEHAVIOUR_RESPECTCASE),
-	widthLBDefault(100),
-	heightLBDefault(100),
+	widthLBDefault(346), // x-studio spec
+	heightLBDefault(168),  // x-studio spec
 	autoSort(SC_ORDER_PRESORTED) {
 	lb.reset(ListBox::Allocate());
 }

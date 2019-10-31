@@ -843,6 +843,20 @@ void ScintillaBase::NotifyStyleToNeeded(Sci::Position endStyleNeeded) {
 	Editor::NotifyStyleToNeeded(endStyleNeeded);
 }
 
+// x-studio spec
+#define SCI_AUTOCFORE 20001
+#define SCI_AUTOCBACK 20002
+#define SCI_AUTOCFOREHIGHLIGHT 20003
+#define SCI_AUTOCBACKHIGHLIGHT 20004
+
+namespace Scintilla { namespace acext { // x-studio spec
+    extern void SetFore(unsigned int fore);
+    extern void SetBack(unsigned int fore);
+
+    extern void SetForeHighLight(unsigned int fore);
+    extern void SetBackHighlight(unsigned int fore);
+ };};
+
 void ScintillaBase::NotifyLexerChanged(Document *, void *) {
 #ifdef SCI_LEXER
 	vs.EnsureStyle(0xff);
@@ -854,7 +868,27 @@ sptr_t ScintillaBase::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lPara
 	case SCI_AUTOCSHOW:
 		listType = 0;
 		AutoCompleteStart(static_cast<Sci::Position>(wParam), ConstCharPtrFromSPtr(lParam));
+#if 1
+        // x-studio spec, vs like autoc window
+        return reinterpret_cast<sptr_t>(this->ac.lb->GetID());
+#else
 		break;
+#endif
+    case SCI_AUTOCFORE:
+        acext::SetFore(wParam);
+        break;
+
+    case SCI_AUTOCBACK:
+        acext::SetBack(wParam);
+        break;
+
+    case SCI_AUTOCFOREHIGHLIGHT:
+        acext::SetForeHighLight(wParam);
+        break;
+
+    case SCI_AUTOCBACKHIGHLIGHT:
+        acext::SetBackHighlight(wParam);
+        break;
 
 	case SCI_AUTOCCANCEL:
 		ac.Cancel();
@@ -1067,8 +1101,8 @@ sptr_t ScintillaBase::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lPara
 		          ConstCharPtrFromSPtr(lParam));
 		break;
 
-	case SCI_GETPROPERTY:
-		return StringResult(lParam, DocumentLexState()->PropGet(ConstCharPtrFromUPtr(wParam)));
+	case SCI_GETPROPERTY: // x-studio spec.
+        return reinterpret_cast<sptr_t>(DocumentLexState()->PropGet(ConstCharPtrFromUPtr(wParam))); // StringResult(lParam, DocumentLexState()->PropGet(ConstCharPtrFromUPtr(wParam)));
 
 	case SCI_GETPROPERTYEXPANDED:
 		return DocumentLexState()->PropGetExpanded(ConstCharPtrFromUPtr(wParam),

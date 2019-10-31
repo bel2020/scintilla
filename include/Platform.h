@@ -76,6 +76,9 @@
 
 #endif
 
+#include <memory>
+#include <string_view>
+
 namespace Scintilla {
 
 typedef float XYPOSITION;

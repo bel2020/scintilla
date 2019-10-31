@@ -54,6 +54,7 @@ public:
 	KeyMap();
 	~KeyMap();
 	void Clear() noexcept;
+	void Reset() noexcept;
 	void AssignCmdKey(int key, int modifiers, unsigned int msg);
 	unsigned int Find(int key, int modifiers) const;	// 0 returned on failure
 	const std::map<KeyModifiers, unsigned int> &GetKeyMap() const noexcept;

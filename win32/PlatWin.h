@@ -8,6 +8,8 @@
 #ifndef PLATWIN_H
 #define PLATWIN_H
 
+#define USE_D2D 1
+
 namespace Scintilla {
 
 extern void Platform_Initialise(void *hInstance);

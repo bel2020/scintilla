@@ -56,6 +56,7 @@
 #include "EditView.h"
 #include "Editor.h"
 #include "ElapsedPeriod.h"
+#include "ScintillaExt.h"
 
 using namespace Scintilla;
 
@@ -1796,7 +1797,7 @@ void Editor::Paint(Surface *surfaceWindow, PRectangle rcArea) {
 		}
 	}
 
-	NotifyPainted();
+	NotifyPainted(surfaceWindow);
 }
 
 // This is mostly copied from the Paint method but with some things omitted
@@ -1906,6 +1907,9 @@ void Editor::InsertCharacter(std::string_view sv, CharacterSource charSource) {
 	if (sv.empty()) {
 		return;
 	}
+
+	NotifyChar(static_cast<unsigned char>(sv[0]), charSource, SCN_CHARADDING);
+
 	FilterSelections();
 	{
 		UndoGroup ug(pdoc, (sel.Count() > 1) || !sel.Empty() || inOverstrike);
@@ -2154,6 +2158,21 @@ void Editor::Cut() {
 	}
 }
 
+void Editor::LineCut()
+{ // x-studio spec
+    pdoc->CheckReadOnly();
+    if (!pdoc->IsReadOnly() && !SelectionContainsProtected()) {
+        if (!sel.Empty()) {
+            SelectionText selectedText;
+            CopySelectionRange(&selectedText);
+
+            selectedText.lineCopy = true;
+            CopyToClipboard(selectedText);
+        }
+        ClearSelection();
+    }
+}
+
 void Editor::PasteRectangular(SelectionPosition pos, const char *ptr, Sci::Position len) {
 	if (pdoc->IsReadOnly() || SelectionContainsProtected()) {
 		return;
@@ -2342,9 +2361,9 @@ void Editor::NotifyErrorOccurred(Document *, void *, int status) {
 	errorStatus = status;
 }
 
-void Editor::NotifyChar(int ch, CharacterSource charSource) {
+void Editor::NotifyChar(int ch, CharacterSource charSource, int nmcode) {
 	SCNotification scn = {};
-	scn.nmhdr.code = SCN_CHARADDED;
+	scn.nmhdr.code = nmcode;
 	scn.ch = ch;
 	scn.characterSource = static_cast<int>(charSource);
 	NotifyParent(scn);
@@ -2411,9 +2430,10 @@ bool Editor::NotifyUpdateUI() {
 	return false;
 }
 
-void Editor::NotifyPainted() {
+void Editor::NotifyPainted(Surface* surfaceWindow) {
 	SCNotification scn = {};
 	scn.nmhdr.code = SCN_PAINTED;
+    scn.wParam = (uptr_t)surfaceWindow;
 	NotifyParent(scn);
 }
 
@@ -2430,13 +2450,13 @@ void Editor::NotifyIndicatorClick(bool click, Sci::Position position, int modifi
 }
 
 bool Editor::NotifyMarginClick(Point pt, int modifiers) {
-	const int marginClicked = vs.MarginFromLocation(pt);
-	if ((marginClicked >= 0) && vs.ms[marginClicked].sensitive) {
-		const Sci::Position position = pdoc->LineStart(LineFromLocation(pt));
-		if ((vs.ms[marginClicked].mask & SC_MASK_FOLDERS) && (foldAutomatic & SC_AUTOMATICFOLD_CLICK)) {
+	const int varMarginClick = vs.MarginFromLocation(pt);
+	if ((varMarginClick >= 0) && vs.ms[varMarginClick].sensitive) {
+		const Sci::Position position = static_cast<Sci::Position>(pdoc->LineStart(LineFromLocation(pt)));
+		if ((vs.ms[varMarginClick].mask & SC_MASK_FOLDERS) && (foldAutomatic & SC_AUTOMATICFOLD_CLICK)) {
 			const bool ctrl = (modifiers & SCI_CTRL) != 0;
 			const bool shift = (modifiers & SCI_SHIFT) != 0;
-			const Sci::Line lineClick = pdoc->SciLineFromPosition(position);
+			const Sci::Line lineClick = static_cast<Sci::Line>(pdoc->LineFromPosition(position));
 			if (shift && ctrl) {
 				FoldAll(SC_FOLDACTION_TOGGLE);
 			} else {
@@ -2458,15 +2478,37 @@ bool Editor::NotifyMarginClick(Point pt, int modifiers) {
 		SCNotification scn = {};
 		scn.nmhdr.code = SCN_MARGINCLICK;
 		scn.modifiers = modifiers;
-		scn.position = position;
-		scn.margin = marginClicked;
+		scn.position = marginClickPos = position;
+		scn.margin = marginClicked = varMarginClick;
 		NotifyParent(scn);
 		return true;
 	} else {
+        marginClicked = -1;
+        marginClickPos = INVALID_POSITION;
 		return false;
 	}
 }
 
+bool Editor::NotifyMarginReleaseClick(Point pt, int modifiers)
+{ // x-studio spec, Margin Release Click support
+    const int varMarginClick = vs.MarginFromLocation(pt);
+    if (marginClicked != -1 && marginClickPos != INVALID_POSITION)
+    {
+        Sci::Position position = pdoc->LineStart(LineFromLocation(pt));
+
+        SCNotification scn = {};
+        scn.nmhdr.code = SCN_MARGINRELEASECLICK;
+        scn.modifiers = modifiers;
+        scn.position = position;
+        scn.margin = varMarginClick;
+        if (marginClicked == varMarginClick) scn.lParam |= 1;
+        if (marginClickPos == position) scn.lParam |= 2;
+        NotifyParent(scn);
+        return true;
+    }
+
+    return false;
+}
 bool Editor::NotifyMarginRightClick(Point pt, int modifiers) {
 	const int marginRightClicked = vs.MarginFromLocation(pt);
 	if ((marginRightClicked >= 0) && vs.ms[marginRightClicked].sensitive) {
@@ -3893,7 +3935,7 @@ int Editor::KeyCommand(unsigned int iMessage) {
 			const Sci::Position start = pdoc->LineStart(lineStart);
 			const Sci::Position end = pdoc->LineStart(lineEnd + 1);
 			SetSelection(start, end);
-			Cut();
+            LineCut(); // x-studio spec, orig code: Cut();
 			SetLastXChosen();
 		}
 		break;
@@ -4645,7 +4687,11 @@ void Editor::ButtonDownWithModifiers(Point pt, unsigned int curTime, int modifie
 			if (inDragDrop != ddInitial) {
 				SetDragPosition(SelectionPosition(Sci::invalidPosition));
 				if (!shift) {
-					if (ctrl && multipleSelection) {
+					if (ctrl && multipleSelection 
+                        /*x-studio spec spec: disable mutipleSel when hotSpot or hoverIndicator clicked*/
+                        && hotSpotClickPos == Sci::invalidPosition
+                        && hoverIndicatorPos == Sci::invalidPosition)
+                    {
 						const SelectionRange range(newPos);
 						sel.TentativeSelection(range);
 						InvalidateSelection(range, true);
@@ -4756,6 +4802,7 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, int modifiers) {
 		DwellEnd(true);
 	}
 
+    bool ctrl = modifiers & SCI_CTRL; // x-studio spec
 	SelectionPosition movePos = SPositionFromLocation(pt, false, false,
 		AllowVirtualSpace(virtualSpaceOptions, sel.IsRectangular()));
 	movePos = MovePositionOutsideChar(movePos, sel.MainCaret() - movePos.Position());
@@ -4862,11 +4909,11 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, int modifiers) {
 			DisplayCursor(Window::cursorArrow);
 		} else {
 			SetHoverIndicatorPoint(pt);
-			if (PointIsHotspot(pt)) {
-				DisplayCursor(Window::cursorHand);
+			if (PointIsHotspot(pt)) { // x-studio spec
+				DisplayCursor(ctrl ? Window::cursorHand : Window::cursorText);
 				SetHotSpotRange(&pt);
 			} else {
-				if (hoverIndicatorPos != Sci::invalidPosition)
+				if (ctrl && hoverIndicatorPos != Sci::invalidPosition)
 					DisplayCursor(Window::cursorHand);
 				else
 					DisplayCursor(Window::cursorText);
@@ -4895,6 +4942,8 @@ void Editor::ButtonUpWithModifiers(Point pt, unsigned int curTime, int modifiers
 		newCharPos = MovePositionOutsideChar(newCharPos, -1);
 		NotifyHotSpotReleaseClick(newCharPos.Position(), modifiers & SCI_CTRL);
 	}
+	// x-studio spec
+        NotifyMarginReleaseClick(pt, modifiers /*(modifiers & SCI_CTRL) ? SCI_CTRL : 0*/ );
 	if (HaveMouseCapture()) {
 		if (PointInSelMargin(pt)) {
 			DisplayCursor(GetMarginCursor(pt));
@@ -5858,6 +5907,15 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 		}
 		EnsureCaretVisible();
 		break;
+
+
+    case SCI_QUICK_PASTE: // x-studio spec
+        QuickPaste();
+        if ((caretSticky == SC_CARETSTICKY_OFF) || (caretSticky == SC_CARETSTICKY_WHITESPACE)) {
+            SetLastXChosen();
+        }
+        EnsureCaretVisible();
+        break;
 
 	case SCI_CLEAR:
 		Clear();
@@ -7364,6 +7422,10 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 		kmap.Clear();
 		break;
 
+	case SCI_RESETALLCMDKEYS:
+		kmap.Reset();
+		break;
+
 	case SCI_INDICSETSTYLE:
 		if (wParam <= INDICATOR_MAX) {
 			vs.indicators[wParam].sacNormal.style = static_cast<int>(lParam);
@@ -8280,9 +8342,26 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 
 	case SCI_COUNTCODEUNITS:
 		return pdoc->CountUTF16(static_cast<Sci::Position>(wParam), lParam);
-
-	default:
-		return DefWndProc(iMessage, wParam, lParam);
+    case SCI_ALPHARECTANGLE:
+        (void)0; {
+            auto surfaceWindow = (Surface*)(wParam);
+            auto parameter = (AlphaRectangleParameters*)(lParam);
+            surfaceWindow->AlphaRectangle(parameter->rectangle, parameter->cornerSize/*cornerSize*/,
+                parameter->colorFill, parameter->alphaFill,
+                parameter->colorOutline, parameter->alphaOutline,
+                0 /*unused: flags */);
+        }
+        return 1;
+	default: 
+        (void)0; { // x-studio spec, notify unknown message to parent, make sure user end have chance to process the message.
+            SCNotification scn = {};
+            scn.nmhdr.code = SCN_UNKNOWN_MESSAGE;
+            scn.wParam = iMessage;
+            NotifyParent(scn);
+            if(!scn.lParam)
+                return DefWndProc(iMessage, wParam, lParam);
+        }
+        return 1;
 	}
 	//Platform::DebugPrintf("end wnd proc\n");
 	return 0;

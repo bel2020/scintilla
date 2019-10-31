@@ -317,16 +317,17 @@ static void DrawTabArrow(Surface *surface, PRectangle rcTab, int ymid, const Vie
 
 void EditView::RefreshPixMaps(Surface *surfaceWindow, WindowID wid, const ViewStyle &vsDraw) {
 	if (!pixmapIndentGuide->Initialised()) {
+        const int dashLength = 3; // x-studio spec spec. x-studio spec.
 		// 1 extra pixel in height so can handle odd/even positions and so produce a continuous line
-		pixmapIndentGuide->InitPixMap(1, vsDraw.lineHeight + 1, surfaceWindow, wid);
-		pixmapIndentGuideHighlight->InitPixMap(1, vsDraw.lineHeight + 1, surfaceWindow, wid);
-		const PRectangle rcIG = PRectangle::FromInts(0, 0, 1, vsDraw.lineHeight);
+		pixmapIndentGuide->InitPixMap(1, vsDraw.lineHeight + dashLength, surfaceWindow, wid);
+		pixmapIndentGuideHighlight->InitPixMap(1, vsDraw.lineHeight + dashLength, surfaceWindow, wid);
+		PRectangle rcIG = PRectangle::FromInts(0, 0, 1, vsDraw.lineHeight + dashLength);
 		pixmapIndentGuide->FillRectangle(rcIG, vsDraw.styles[STYLE_INDENTGUIDE].back);
 		pixmapIndentGuide->PenColour(vsDraw.styles[STYLE_INDENTGUIDE].fore);
 		pixmapIndentGuideHighlight->FillRectangle(rcIG, vsDraw.styles[STYLE_BRACELIGHT].back);
 		pixmapIndentGuideHighlight->PenColour(vsDraw.styles[STYLE_BRACELIGHT].fore);
-		for (int stripe = 1; stripe < vsDraw.lineHeight + 1; stripe += 2) {
-			const PRectangle rcPixel = PRectangle::FromInts(0, stripe, 1, stripe + 1);
+		for (int stripe = 1; stripe < vsDraw.lineHeight + dashLength; stripe += (2 * dashLength)) {
+			PRectangle rcPixel = PRectangle::FromInts(0, stripe, 1, stripe + dashLength);
 			pixmapIndentGuide->FillRectangle(rcPixel, vsDraw.styles[STYLE_INDENTGUIDE].fore);
 			pixmapIndentGuideHighlight->FillRectangle(rcPixel, vsDraw.styles[STYLE_BRACELIGHT].fore);
 		}
@@ -859,10 +860,12 @@ static ColourDesired TextBackground(const EditModel &model, const ViewStyle &vsD
 	}
 }
 
-void EditView::DrawIndentGuide(Surface *surface, Sci::Line lineVisible, int lineHeight, XYPOSITION start, PRectangle rcSegment, bool highlight) {
+void EditView::DrawIndentGuide(Surface *surface, Sci::Line lineVisible, int lineHeight, XYPOSITION start, PRectangle rcSegment, bool highlight, int zoomLevel) {
+    
+    int offset = static_cast<int>(std::max(0.0f, 5 * (zoomLevel + 30) / 30.0f)); // x-studio spec.
 	const Point from = Point::FromInts(0, ((lineVisible & 1) && (lineHeight & 1)) ? 1 : 0);
-	const PRectangle rcCopyArea(start + 1, rcSegment.top,
-		start + 2, rcSegment.bottom);
+	const PRectangle rcCopyArea(start + offset, rcSegment.top,
+		start + offset + 1, rcSegment.bottom);
 	surface->Copy(rcCopyArea, from,
 		highlight ? *pixmapIndentGuideHighlight : *pixmapIndentGuide);
 }
@@ -1848,7 +1851,7 @@ void EditView::DrawForeground(Surface *surface, const EditModel &model, const Vi
 							if (indentCount > 0) {
 								const XYPOSITION xIndent = std::floor(indentCount * indentWidth);
 								DrawIndentGuide(surface, lineVisible, vsDraw.lineHeight, xIndent + xStart, rcSegment,
-									(ll->xHighlightGuide == xIndent));
+									(ll->xHighlightGuide == xIndent), vsDraw.zoomLevel);
 							}
 						}
 					}
@@ -1927,7 +1930,7 @@ void EditView::DrawForeground(Surface *surface, const EditModel &model, const Vi
 									if (indentCount > 0) {
 										const XYPOSITION xIndent = std::floor(indentCount * indentWidth);
 										DrawIndentGuide(surface, lineVisible, vsDraw.lineHeight, xIndent + xStart, rcSegment,
-											(ll->xHighlightGuide == xIndent));
+											(ll->xHighlightGuide == xIndent), vsDraw.zoomLevel);
 									}
 								}
 							}
@@ -2005,7 +2008,7 @@ void EditView::DrawIndentGuidesOverEmpty(Surface *surface, const EditModel &mode
 			const XYPOSITION xIndent = std::floor(indentPos * vsDraw.spaceWidth);
 			if (xIndent < xStartText) {
 				DrawIndentGuide(surface, lineVisible, vsDraw.lineHeight, xIndent + xStart, rcLine,
-					(ll->xHighlightGuide == xIndent));
+					(ll->xHighlightGuide == xIndent), vsDraw.zoomLevel);
 			}
 		}
 	}

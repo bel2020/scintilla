@@ -173,6 +173,7 @@ int Scintilla_LinkLexers() {
 	LINK_LEXER(lmRust);
 	LINK_LEXER(lmSAS);
 	LINK_LEXER(lmScriptol);
+	LINK_LEXER(lmSearchResult); // x-studio spec, search result
 	LINK_LEXER(lmSmalltalk);
 	LINK_LEXER(lmSML);
 	LINK_LEXER(lmSorc);
