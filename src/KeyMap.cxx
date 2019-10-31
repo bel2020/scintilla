@@ -35,6 +35,7 @@ void KeyMap::Clear() noexcept {
 
 void KeyMap::Reset() noexcept
 {
+    Clear();
     for (int i = 0; MapDefault[i].key; i++) {
         AssignCmdKey(MapDefault[i].key,
             MapDefault[i].modifiers,

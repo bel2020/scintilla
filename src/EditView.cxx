@@ -317,7 +317,7 @@ static void DrawTabArrow(Surface *surface, PRectangle rcTab, int ymid, const Vie
 
 void EditView::RefreshPixMaps(Surface *surfaceWindow, WindowID wid, const ViewStyle &vsDraw) {
 	if (!pixmapIndentGuide->Initialised()) {
-        const int dashLength = 3; // x-studio365 spec spec. x-studio365 spec.
+        const int dashLength = 3; // x-studio spec spec. x-studio spec.
 		// 1 extra pixel in height so can handle odd/even positions and so produce a continuous line
 		pixmapIndentGuide->InitPixMap(1, vsDraw.lineHeight + dashLength, surfaceWindow, wid);
 		pixmapIndentGuideHighlight->InitPixMap(1, vsDraw.lineHeight + dashLength, surfaceWindow, wid);
@@ -862,7 +862,7 @@ static ColourDesired TextBackground(const EditModel &model, const ViewStyle &vsD
 
 void EditView::DrawIndentGuide(Surface *surface, Sci::Line lineVisible, int lineHeight, XYPOSITION start, PRectangle rcSegment, bool highlight, int zoomLevel) {
     
-    int offset = static_cast<int>(std::max(0.0f, 5 * (zoomLevel + 30) / 30.0f)); // x-studio365 spec.
+    int offset = static_cast<int>(std::max(0.0f, 5 * (zoomLevel + 30) / 30.0f)); // x-studio spec.
 	const Point from = Point::FromInts(0, ((lineVisible & 1) && (lineHeight & 1)) ? 1 : 0);
 	const PRectangle rcCopyArea(start + offset, rcSegment.top,
 		start + offset + 1, rcSegment.bottom);

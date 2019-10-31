@@ -163,7 +163,7 @@ void CallTip::DrawChunk(Surface *surface, int &x, const char *s,
                         surface->DrawTextTransparent(rcClient, font, static_cast<XYPOSITION>(ytext),
                             segText, colourUnSel);
                     }
-                    else { // x-studio365 spec: highlight bold support
+                    else { // x-studio spec: highlight bold support
                         surface->DrawTextTransparent(rcClient, fontSel, static_cast<XYPOSITION>(ytext),
                             segText, colourSel);
                     }
@@ -240,7 +240,7 @@ void CallTip::PaintCT(Surface *surfaceWindow) {
 	PaintContents(surfaceWindow, true);
 
 #ifndef __APPLE__
-#if 1 // x-studio365 spec, vs-like calltip
+#if 1 // x-studio spec, vs-like calltip
     surfaceWindow->MoveTo(0, static_cast<int>(rcClientSize.bottom) - 1);
     surfaceWindow->PenColour(colourLight);
     surfaceWindow->LineTo(static_cast<int>(rcClientSize.right) - 1, static_cast<int>(rcClientSize.bottom) - 1);
@@ -288,7 +288,7 @@ PRectangle CallTip::CallTipStart(Sci::Position pos, Point pt, int textHeight, co
 	const XYPOSITION deviceHeight = static_cast<XYPOSITION>(surfaceMeasure->DeviceHeightFont(size));
     FontParameters fp(faceName, deviceHeight / SC_FONT_SIZE_MULTIPLIER, SC_WEIGHT_NORMAL, false, 0, technology, characterSet);
 	font.Create(fp);
-    /// x-studio365 spec
+    /// x-studio spec
     fp.weight = SC_WEIGHT_BOLD;
     fontSel.Create(fp);
 

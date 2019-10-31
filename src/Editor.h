@@ -204,8 +204,8 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	bool dropWentOutside;
 	SelectionPosition posDrop;
 	Sci::Position hotSpotClickPos;
-    int marginClicked; // x-studio365 spec: margin release click support
-    Sci::Position marginClickPos; // x-studio365 spec: margin release click support
+    int marginClicked; // x-studio spec: margin release click support
+    Sci::Position marginClickPos; // x-studio spec: margin release click support
 	int lastXChosen;
 	Sci::Position lineAnchorPos;
 	Sci::Position originalAnchorPos;
@@ -404,13 +404,13 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	void ClearAll();
 	void ClearDocumentStyle();
 	virtual void Cut();
-    virtual void LineCut(); // x-studio365 spec
+    virtual void LineCut(); // x-studio spec
 	void PasteRectangular(SelectionPosition pos, const char *ptr, Sci::Position len);
 	virtual void Copy() = 0;
 	virtual void CopyAllowLine();
 	virtual bool CanPaste();
 	virtual void Paste() = 0;
-    virtual void QuickPaste() = 0; // x-studio365 spec
+    virtual void QuickPaste() = 0; // x-studio spec
 	void Clear();
 	virtual void SelectAll();
 	virtual void Undo();
@@ -437,7 +437,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	void NotifyIndicatorClick(bool click, Sci::Position position, int modifiers);
 	bool NotifyMarginClick(Point pt, int modifiers);
 	bool NotifyMarginRightClick(Point pt, int modifiers);
-    bool NotifyMarginReleaseClick(Point pt, int modifiers); // x-studio365 spec
+    bool NotifyMarginReleaseClick(Point pt, int modifiers); // x-studio spec
 	void NotifyNeedShown(Sci::Position pos, Sci::Position len);
 	void NotifyDwelling(Point pt, bool state);
 	void NotifyZoom();

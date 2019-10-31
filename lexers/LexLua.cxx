@@ -51,7 +51,7 @@ static void ColouriseLuaDoc(
     WordList *keywordlists[],
     Accessor &styler) {
 
-    // x-studio365 spec: function name&parameter Colour support.
+    // x-studio spec: function name&parameter Colour support.
     enum SyntaxState {
         normal,
         funcdef_name, // After "function"
@@ -106,7 +106,7 @@ static void ColouriseLuaDoc(
     //int idenStyle = SCE_LUA_IDENTIFIER;
     //bool foundGoto = false;
 
-    //// x-studio365 spec
+    //// x-studio spec
     //bool foundFunction = false; 
 
     // Do not leak onto next line
@@ -227,7 +227,7 @@ static void ColouriseLuaDoc(
                         }
                         sc.SetState(SCE_LUA_DEFAULT);
                     }
-                    else if (strcmp(s, "function") == 0) { // x-studio365 spec, function <name> forward scan, Ah, so easy, send a pull request?
+                    else if (strcmp(s, "function") == 0) { // x-studio spec, function <name> forward scan, Ah, so easy, send a pull request?
                         if (currentSyntaxContext.state == SyntaxState::normal)
                         { // x-sutdio365 spec: function name expected
                             currentSyntaxContext.state = SyntaxState::funcdef_name;
@@ -256,7 +256,7 @@ static void ColouriseLuaDoc(
                 else if (keywords8.InList(s)) {
                     sc.ChangeState(SCE_LUA_WORD8);
                 }
-                else { // x-studio365 spec
+                else { // x-studio spec
                     switch (currentSyntaxContext.state) {
                     case SyntaxState::funcdef_name:
                         sc.ChangeState(SCE_LUA_FUNCTION_NAME);
@@ -397,7 +397,7 @@ static void ColouriseLuaDoc(
             }
             else if (setLuaOperator.Contains(sc.ch)) {
                 sc.SetState(SCE_LUA_OPERATOR);
-                switch (sc.ch) { // x-studio365 spec spec: function param Colourise support.
+                switch (sc.ch) { // x-studio spec spec: function param Colourise support.
                 case '(':
                     if (currentSyntaxContext.state == SyntaxState::funcdef_name)
                         currentSyntaxContext.state = SyntaxState::funcdef_param;
@@ -440,7 +440,7 @@ static void ColouriseLuaDoc(
         }
     }
 
-    if (styler.pprops != nullptr) { // x-studio365 spec
+    if (styler.pprops != nullptr) { // x-studio spec
         char buf[8];
         int n = sprintf(buf, "%d", static_cast<int>(currentSyntaxContext.state));
         styler.pprops->Set("syntax.state", buf, sizeof("syntax.state") - 1, n);

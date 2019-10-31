@@ -17,7 +17,7 @@ class CallTip {
 	int endHighlight;      // ...end of highlighted text
 	std::string val;
 	Font font;
-    Font fontSel;           // x-studio365 spec: highlight bold support
+    Font fontSel;           // x-studio spec: highlight bold support
 	PRectangle rectUp;      // rectangle of last up angle in the tip
 	PRectangle rectDown;    // rectangle of last down arrow in the tip
 	int lineHeight;         // vertical line spacing

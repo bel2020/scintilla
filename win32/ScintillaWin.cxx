@@ -375,7 +375,7 @@ class ScintillaWin :
 	void CopyAllowLine() override;
 	bool CanPaste() override;
 	void Paste() override;
-	void QuickPaste() override; // x-studio365 spec.
+	void QuickPaste() override; // x-studio spec.
 	void CreateCallTipWindow(PRectangle rc) override;
 	void AddToPopUp(const char *label, int cmd = 0, bool enabled = true) override;
 	void ClaimSelection() override;
@@ -387,7 +387,7 @@ class ScintillaWin :
 
 	void GetIntelliMouseParameters() noexcept;
 	void CopyToClipboard(const SelectionText &selectedText) override;
-	void ScrollMessage(WPARAM wParam, LPARAM lParam); // x-studio365 spec
+	void ScrollMessage(WPARAM wParam, LPARAM lParam); // x-studio spec
 	void HorizontalScrollMessage(WPARAM wParam);
 	void FullPaint();
 	void FullPaintDC(HDC hdc);
@@ -1268,7 +1268,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			break;
 
 		case WM_VSCROLL:
-			ScrollMessage(wParam, lParam); // x-studio365 spec
+			ScrollMessage(wParam, lParam); // x-studio spec
 			break;
 
 		case WM_HSCROLL:
@@ -1453,7 +1453,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 						} else if (PointInSelection(PointFromPOINT(pt)) && !SelectionEmpty()) {
 							DisplayCursor(Window::cursorArrow);
 						} else if (KeyboardIsKeyDown(VK_CONTROL) && (PointIsHotspot(PointFromPOINT(pt)) || hoverIndicatorPos != Sci::invalidPosition)) {
-							// x-studio365 spec, avoid flick & looks like VS
+							// x-studio spec, avoid flick & looks like VS
 							DisplayCursor(Window::cursorHand);
 						} else {
 							DisplayCursor(Window::cursorText);
@@ -1502,7 +1502,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
                 POINT pt;
                 if (0 != ::GetCursorPos(&pt)) {
                     ::ScreenToClient(MainHWND(), &pt);
-                    if ((PointIsHotspot(PointFromPOINT(pt)) || hoverIndicatorPos != Sci::invalidPosition)) { // x-studio365 spec, avoid flick & looks like VS
+                    if ((PointIsHotspot(PointFromPOINT(pt)) || hoverIndicatorPos != Sci::invalidPosition)) { // x-studio spec, avoid flick & looks like VS
                         DisplayCursor(Window::cursorHand);
                     }
                 }
@@ -1939,7 +1939,7 @@ void ScintillaWin::UpdateSystemCaret() {
 int ScintillaWin::SetScrollInfo(int nBar, LPCSCROLLINFO lpsi, BOOL bRedraw) noexcept {
     int ret = ::SetScrollInfo(MainHWND(), nBar, lpsi, bRedraw);
 
-    // x-studio365 spec
+    // x-studio spec
     SCNotification scn = { 0 };
     scn.nmhdr.code = SCN_VSCROLLCHANGE;
     NotifyParent(scn);
@@ -2361,7 +2361,7 @@ void ScintillaWin::Paste() {
 }
 
 void ScintillaWin::QuickPaste()
-{ // x-studio365 spec
+{ // x-studio spec
     SelectionText selectedText;
     CopySelectionRange(&selectedText, true);
 

@@ -1,4 +1,4 @@
-/// x-studio365 spec ScintillaExt.h header
+/// x-studio spec ScintillaExt.h header
 #pragma once
 #include "Platform.h"
 

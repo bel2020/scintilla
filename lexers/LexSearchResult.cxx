@@ -113,7 +113,7 @@ static void ColouriseSearchResultDoc(unsigned int startPos, int length, int, Wor
 
 	SearchResultMarkings* pMarkings = NULL;
 	sscanf(addrMarkingsStruct, "%p", &pMarkings);
-    if (pMarkings == nullptr) // x-studio365 spec.
+    if (pMarkings == nullptr) // x-studio spec.
         return;
 
 	PLATFORM_ASSERT(pMarkings);

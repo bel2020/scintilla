@@ -2159,7 +2159,7 @@ void Editor::Cut() {
 }
 
 void Editor::LineCut()
-{ // x-studio365 spec
+{ // x-studio spec
     pdoc->CheckReadOnly();
     if (!pdoc->IsReadOnly() && !SelectionContainsProtected()) {
         if (!sel.Empty()) {
@@ -2490,7 +2490,7 @@ bool Editor::NotifyMarginClick(Point pt, int modifiers) {
 }
 
 bool Editor::NotifyMarginReleaseClick(Point pt, int modifiers)
-{ // x-studio365 spec, Margin Release Click support
+{ // x-studio spec, Margin Release Click support
     const int varMarginClick = vs.MarginFromLocation(pt);
     if (marginClicked != -1 && marginClickPos != INVALID_POSITION)
     {
@@ -3935,7 +3935,7 @@ int Editor::KeyCommand(unsigned int iMessage) {
 			const Sci::Position start = pdoc->LineStart(lineStart);
 			const Sci::Position end = pdoc->LineStart(lineEnd + 1);
 			SetSelection(start, end);
-            LineCut(); // x-studio365 spec, orig code: Cut();
+            LineCut(); // x-studio spec, orig code: Cut();
 			SetLastXChosen();
 		}
 		break;
@@ -4688,7 +4688,7 @@ void Editor::ButtonDownWithModifiers(Point pt, unsigned int curTime, int modifie
 				SetDragPosition(SelectionPosition(Sci::invalidPosition));
 				if (!shift) {
 					if (ctrl && multipleSelection 
-                        /*x-studio365 spec spec: disable mutipleSel when hotSpot or hoverIndicator clicked*/
+                        /*x-studio spec spec: disable mutipleSel when hotSpot or hoverIndicator clicked*/
                         && hotSpotClickPos == Sci::invalidPosition
                         && hoverIndicatorPos == Sci::invalidPosition)
                     {
@@ -4802,7 +4802,7 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, int modifiers) {
 		DwellEnd(true);
 	}
 
-    bool ctrl = modifiers & SCI_CTRL; // x-studio365 spec
+    bool ctrl = modifiers & SCI_CTRL; // x-studio spec
 	SelectionPosition movePos = SPositionFromLocation(pt, false, false,
 		AllowVirtualSpace(virtualSpaceOptions, sel.IsRectangular()));
 	movePos = MovePositionOutsideChar(movePos, sel.MainCaret() - movePos.Position());
@@ -4909,7 +4909,7 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, int modifiers) {
 			DisplayCursor(Window::cursorArrow);
 		} else {
 			SetHoverIndicatorPoint(pt);
-			if (PointIsHotspot(pt)) { // x-studio365 spec
+			if (PointIsHotspot(pt)) { // x-studio spec
 				DisplayCursor(ctrl ? Window::cursorHand : Window::cursorText);
 				SetHotSpotRange(&pt);
 			} else {
@@ -4942,7 +4942,7 @@ void Editor::ButtonUpWithModifiers(Point pt, unsigned int curTime, int modifiers
 		newCharPos = MovePositionOutsideChar(newCharPos, -1);
 		NotifyHotSpotReleaseClick(newCharPos.Position(), modifiers & SCI_CTRL);
 	}
-	// x-studio365 spec
+	// x-studio spec
         NotifyMarginReleaseClick(pt, modifiers /*(modifiers & SCI_CTRL) ? SCI_CTRL : 0*/ );
 	if (HaveMouseCapture()) {
 		if (PointInSelMargin(pt)) {
@@ -5909,7 +5909,7 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 		break;
 
 
-    case SCI_QUICK_PASTE: // x-studio365 spec
+    case SCI_QUICK_PASTE: // x-studio spec
         QuickPaste();
         if ((caretSticky == SC_CARETSTICKY_OFF) || (caretSticky == SC_CARETSTICKY_WHITESPACE)) {
             SetLastXChosen();
@@ -8346,7 +8346,7 @@ sptr_t Editor::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
         }
         return 1;
 	default: 
-        (void)0; { // x-studio365 spec, notify unknown message to parent, make sure user end have chance to process the message.
+        (void)0; { // x-studio spec, notify unknown message to parent, make sure user end have chance to process the message.
             SCNotification scn = {};
             scn.nmhdr.code = SCN_UNKNOWN_MESSAGE;
             scn.wParam = iMessage;

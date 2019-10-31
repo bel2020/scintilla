@@ -3026,7 +3026,7 @@ bool MatchOnLines(const Document *doc, const Regex &regexp, const RESearchRange 
 	// If multiline regex worked well then the line by line iteration could be removed
 	// for the forwards case and replaced with the following 4 lines:
     // @HALX99: Well, MSVC, if no REGEX_MULTILINE, the regex search does not support match CRLF.
-    // see: https://github.com/halx99/x-studio365/issues/225
+    // see: https://github.com/simdsoft/x-studio/issues/225
 #ifdef REGEX_MULTILINE
 	Iterator itStart(doc, resr.startPos);
 	Iterator itEnd(doc, resr.endPos);
